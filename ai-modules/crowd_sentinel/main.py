@@ -64,8 +64,9 @@ _sb = None
 
 # YOLO paths
 GEN_MODEL_PATH    = str(MODELS_DIR / "yolov10s.pt")
-# ✅ Updated to use the freshly trained kavach_weapon_v1.pt (50 epochs, mAP50=0.894)
+# ✅ Fallback-enabled threat model selection
 THREAT_MODEL_PATH = str(MODELS_DIR / "kavach_weapon_v1.pt")
+ALT_THREAT_PATH   = str(MODELS_DIR / "yolo11n_threat_detection.pt")
 MASK_MODEL_PATH   = str(MODELS_DIR / "identity_classifier.pt")
 
 # COCO class IDs — exact integers from YOLOv10s/COCO (source: sentinel.py)
@@ -75,21 +76,49 @@ GEN_LAPTOP     = 63
 GEN_CELL_PHONE = 67
 GEN_CLASSES_FILTER = [GEN_PERSON, GEN_BACKPACK, GEN_LAPTOP, GEN_CELL_PHONE]
 
-# kavach_weapon_v1.pt class map:
-# {0: 'Gunting', 1: 'cutter', 2: 'lighter', 3: 'person', 4: 'pistol'}
-# Classes 0, 1, 2, 4 are weapon threats. Class 3 (person) is context.
-THREAT_WEAPON_CLASSES = {0, 1, 2, 4}  # Gunting, cutter, lighter, pistol
-THREAT_PERSON_CLASS   = 3             # person detected by threat model
-THREAT_CLASSES        = THREAT_WEAPON_CLASSES  # backward compat alias
-
 # ── Model Loading ─────────────────────────────────────────────────────────────
 print(f"[MODEL] Loading Object model: {Path(GEN_MODEL_PATH).name}")
-gen_model = YOLO(GEN_MODEL_PATH)
-print("[MODEL] Object model loaded successfully")
+try:
+    gen_model = YOLO(GEN_MODEL_PATH)
+    print("[MODEL] Object model loaded successfully")
+except Exception as e:
+    logger.error(f"[MODEL] Object model load failed: {e}. Attempting auto-download...")
+    gen_model = YOLO("yolov10s.pt")
 
-print(f"[MODEL] Loading Weapon model: {Path(THREAT_MODEL_PATH).name}  ← kavach_weapon_v1.pt (mAP50=0.894)")
-threat_model = YOLO(THREAT_MODEL_PATH)
-print("[MODEL] ✅ Weapon model loaded (Gunting/cutter/lighter/pistol detection)")
+# Default classes for kavach_weapon_v1.pt (Gunting/cutter/lighter/pistol/person)
+THREAT_WEAPON_CLASSES = {0, 1, 2, 4}
+THREAT_PERSON_CLASS   = 3
+
+print(f"[MODEL] Loading Weapon model: {Path(THREAT_MODEL_PATH).name}")
+try:
+    if not Path(THREAT_MODEL_PATH).exists() and Path(ALT_THREAT_PATH).exists():
+        print(f"[WARN] Primary threat model {Path(THREAT_MODEL_PATH).name} missing. Falling back to {Path(ALT_THREAT_PATH).name}")
+        THREAT_MODEL_PATH = ALT_THREAT_PATH
+        # Dynamic ID mapping for yolo11n_threat_detection.pt
+        # {0: 'ammo', 1: 'firearm', 2: 'grenade', 3: 'knife', 4: 'pistol', 5: 'rocket'}
+        THREAT_WEAPON_CLASSES = {0, 1, 2, 3, 4, 5}
+        THREAT_PERSON_CLASS   = -1 # No person in this model
+    
+    threat_model = YOLO(THREAT_MODEL_PATH)
+    print(f"[MODEL] ✅ Weapon model loaded: {Path(THREAT_MODEL_PATH).name}")
+    
+    # Final check: if the model has 'Gunting' it's the custom one, if 'firearm' it's the alternative
+    if 'Gunting' in threat_model.names.values():
+        THREAT_WEAPON_CLASSES = {0, 1, 2, 4}
+        THREAT_PERSON_CLASS   = 3
+    elif 'firearm' in threat_model.names.values():
+        THREAT_WEAPON_CLASSES = {0, 1, 2, 3, 4, 5}
+        THREAT_PERSON_CLASS   = -1
+    
+    THREAT_CLASSES = THREAT_WEAPON_CLASSES
+
+except Exception as e:
+    logger.error(f"CRITICAL: Failed to load any threat model! {e}")
+    # Last ditch: load a tiny standard YOLO as dummy to prevent crash
+    threat_model = YOLO("yolov8n.pt") 
+    THREAT_WEAPON_CLASSES = set()
+    THREAT_PERSON_CLASS   = 0
+    THREAT_CLASSES        = set()
 
 gen_model.fuse()
 threat_model.fuse()

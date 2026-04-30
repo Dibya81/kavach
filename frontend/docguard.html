@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | DocGuard</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <style>
+        .mode-tab {
+            padding: 10px 24px; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600; border: 1px solid rgba(255,255,255,0.1);
+            background: transparent; color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .mode-tab.active {
+            background: rgba(0,210,255,0.1); border-color: var(--cyber-blue);
+            color: var(--cyber-blue);
+        }
+        .dropzone {
+            border: 2px dashed rgba(255,255,255,0.12);
+            border-radius: 12px; padding: 40px 20px; text-align: center;
+            cursor: pointer; transition: all 0.2s; position: relative;
+        }
+        .dropzone:hover, .dropzone.drag-over {
+            border-color: var(--cyber-blue);
+            background: rgba(0,210,255,0.04);
+        }
+        .dropzone input[type=file] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+        }
+        .result-card {
+            border-radius: 12px; padding: 24px; margin-top: 24px;
+            display: none;
+        }
+        .result-card.valid   { background: rgba(0,230,118,0.06); border: 1px solid rgba(0,230,118,0.25); }
+        .result-card.tampered{ background: rgba(255,51,102,0.06); border: 1px solid rgba(255,51,102,0.3); }
+        .result-card.registered { background: rgba(0,210,255,0.06); border: 1px solid rgba(0,210,255,0.25); }
+        .diff-word {
+            display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 12px;
+        }
+        .diff-added   { background: rgba(0,230,118,0.2); color: var(--safe-green); }
+        .diff-removed { background: rgba(255,51,102,0.2); color: var(--critical-red); text-decoration: line-through; }
+        .diff-changed { background: rgba(255,176,32,0.2); color: #FFB020; }
+        .similarity-bar {
+            height: 8px; border-radius: 4px; margin-top: 8px;
+            background: rgba(255,255,255,0.06);
+            overflow: hidden;
+        }
+        .similarity-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+        .doc-list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        @media (max-width: 768px) {
+            .mode-tabs-wrap { flex-direction: column; }
+            .result-grid-dg { grid-template-columns: 1fr !important; }
+            .dropzone { padding: 30px 15px; }
+            header { flex-direction: column; align-items: flex-start !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item active"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header style="margin-bottom:28px;">
+                <h1 style="font-size:24px; font-weight:700;">DocGuard — Document Verification</h1>
+                <p class="muted" style="margin-top:4px;">Register originals and detect tampering in suspicious documents.</p>
+            </header>
+
+            <!-- Mode Selector -->
+            <div class="mode-tabs-wrap" style="display:flex; gap:12px; margin-bottom:28px;">
+                <button class="mode-tab active" id="tab-register" onclick="setMode('register')">
+                    <i class="fas fa-upload" style="margin-right:8px;"></i>Register Original
+                </button>
+                <button class="mode-tab" id="tab-verify" onclick="setMode('verify')">
+                    <i class="fas fa-search-plus" style="margin-right:8px;"></i>Verify Suspicious Doc
+                </button>
+                <button class="mode-tab" id="tab-list" onclick="setMode('list')">
+                    <i class="fas fa-list" style="margin-right:8px;"></i>Registered Docs
+                </button>
+            </div>
+
+            <!-- REGISTER MODE -->
+            <div id="mode-register">
+                <div class="card">
+                    <h3 style="font-size:15px; font-weight:700; margin-bottom:6px;">Register Original Document</h3>
+                    <p class="muted" style="font-size:12px; margin-bottom:24px;">Upload the authentic baseline document. Its fingerprint will be stored for future comparison.</p>
+
+                    <div style="margin-bottom:16px;">
+                        <label style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); display:block; margin-bottom:6px;">Document ID (unique key)</label>
+                        <input type="text" id="reg-doc-id" placeholder="e.g. PAN-SHARMA-001 or AADHAAR-9876"
+                            style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 14px; color:#fff; font-family:var(--font-mono); font-size:13px; outline:none;">
+                    </div>
+
+                    <div class="dropzone" id="reg-dropzone">
+                        <input type="file" id="reg-file" accept=".pdf,.jpg,.jpeg,.png,.txt" onchange="onRegFileSelect(this)">
+                        <i class="fas fa-cloud-upload-alt" style="font-size:36px; color:var(--cyber-blue); margin-bottom:14px; display:block;"></i>
+                        <div style="font-size:14px; font-weight:600;">Drop Original Document</div>
+                        <p class="muted" style="font-size:12px; margin-top:6px;">PDF, JPG, PNG, TXT — max 10MB</p>
+                        <div id="reg-file-name" style="margin-top:12px; color:var(--cyber-blue); font-size:13px; display:none;"></div>
+                    </div>
+
+                    <button class="btn btn-primary" style="margin-top:20px;" onclick="registerDoc()" id="reg-btn">
+                        <i class="fas fa-fingerprint"></i> Register & Store Fingerprint
+                    </button>
+
+                    <div class="result-card registered" id="reg-result">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                            <i class="fas fa-check-circle" style="color:var(--cyber-blue); font-size:20px;"></i>
+                            <h4 style="font-weight:700; color:var(--cyber-blue);">Document Registered</h4>
+                        </div>
+                        <div class="result-grid-dg" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div>
+                                <div class="muted" style="font-size:10px; text-transform:uppercase;">Doc ID</div>
+                                <div class="mono" id="reg-result-id" style="font-size:13px; color:var(--cyber-blue);"></div>
+                            </div>
+                            <div>
+                                <div class="muted" style="font-size:10px; text-transform:uppercase;">Fingerprint Hash</div>
+                                <div class="mono" id="reg-result-hash" style="font-size:11px; word-break:break-all;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VERIFY MODE -->
+            <div id="mode-verify" style="display:none;">
+                <div class="card">
+                    <h3 style="font-size:15px; font-weight:700; margin-bottom:6px;">Verify Suspicious Document</h3>
+                    <p class="muted" style="font-size:12px; margin-bottom:24px;">Upload the suspected document. System compares it against the registered baseline.</p>
+
+                    <div style="margin-bottom:16px;">
+                        <label style="font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); display:block; margin-bottom:6px;">Document ID to compare against</label>
+                        <input type="text" id="ver-doc-id" placeholder="Must match the registered Doc ID"
+                            style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 14px; color:#fff; font-family:var(--font-mono); font-size:13px; outline:none;">
+                    </div>
+
+                    <div class="dropzone" id="ver-dropzone">
+                        <input type="file" id="ver-file" accept=".pdf,.jpg,.jpeg,.png,.txt" onchange="onVerFileSelect(this)">
+                        <i class="fas fa-search-plus" style="font-size:36px; color:#FFB020; margin-bottom:14px; display:block;"></i>
+                        <div style="font-size:14px; font-weight:600;">Drop Suspicious Document</div>
+                        <p class="muted" style="font-size:12px; margin-top:6px;">Same formats supported</p>
+                        <div id="ver-file-name" style="margin-top:12px; color:#FFB020; font-size:13px; display:none;"></div>
+                    </div>
+
+                    <button class="btn btn-primary" style="margin-top:20px; background:rgba(255,176,32,0.15); border-color:#FFB020; color:#FFB020;" onclick="verifyDoc()" id="ver-btn">
+                        <i class="fas fa-shield-alt"></i> Analyze for Tampering
+                    </button>
+
+                    <!-- Verification Result -->
+                    <div class="result-card" id="ver-result">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+                            <i id="ver-icon" style="font-size:24px;"></i>
+                            <h4 id="ver-title" style="font-weight:700; font-size:16px;"></h4>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:20px;">
+                            <div>
+                                <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:4px;">Similarity Score</div>
+                                <div id="ver-score" style="font-size:24px; font-weight:800;"></div>
+                                <div class="similarity-bar">
+                                    <div class="similarity-fill" id="ver-score-bar"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:4px;">Words Added</div>
+                                <div id="ver-added" style="font-size:20px; font-weight:700; color:var(--safe-green);"></div>
+                            </div>
+                            <div>
+                                <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:4px;">Words Removed</div>
+                                <div id="ver-removed" style="font-size:20px; font-weight:700; color:var(--critical-red);"></div>
+                            </div>
+                        </div>
+
+                        <div id="ver-visual-wrap" style="margin-bottom:16px; display:none;">
+                            <div style="background:rgba(255,51,102,0.1); border:1px solid rgba(255,51,102,0.2); border-radius:8px; padding:12px; display:flex; align-items:center; gap:12px;">
+                                <i class="fas fa-eye" style="color:var(--critical-red);"></i>
+                                <div style="font-size:12px;">
+                                    <strong style="color:var(--critical-red);">Visual Tampering Detected:</strong> 
+                                    Significant pixel-level changes found in document structure. 
+                                    (SSIM: <span id="ver-ssim"></span>)
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ver-diff-wrap">
+                            <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Tampered Regions (Textual Diff)</div>
+                            <div id="ver-diff" style="line-height:2; font-size:12px; padding:16px; background:rgba(0,0,0,0.2); border-radius:8px; max-height:200px; overflow-y:auto;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LIST MODE -->
+            <div id="mode-list" style="display:none;">
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h3 style="font-size:15px; font-weight:700;">Registered Document Baselines</h3>
+                        <button class="btn btn-outline btn-sm" onclick="loadDocList()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                    <div id="doc-list-container">
+                        <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:40px;">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html" class="active"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+        function setMode(mode) {
+            ['register','verify','list'].forEach(m => {
+                document.getElementById('mode-' + m).style.display = m === mode ? 'block' : 'none';
+                document.getElementById('tab-' + m).classList.toggle('active', m === mode);
+            });
+            if (mode === 'list') loadDocList();
+        }
+
+        async function registerDoc() {
+            const docId = document.getElementById('reg-doc-id').value;
+            const file = document.getElementById('reg-file').files[0];
+            if (!docId || !file) return;
+
+            const btn = document.getElementById('reg-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+
+            try {
+                const res = await uploadDocumentBaseline(file, docId);
+                document.getElementById('reg-result').style.display = 'block';
+                document.getElementById('reg-result-id').textContent = res.doc_id;
+                document.getElementById('reg-result-hash').textContent = res.hash;
+            } catch(e) { alert('Registration failed: ' + e.message); }
+            finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-fingerprint"></i> Register & Store Fingerprint';
+            }
+        }
+
+        async function verifyDoc() {
+            const docId = document.getElementById('ver-doc-id').value;
+            const file = document.getElementById('ver-file').files[0];
+            if (!docId || !file) return;
+
+            const btn = document.getElementById('ver-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+
+            try {
+                // Wrapper currently doesn't take explicit doc_id easily, let's call it manually via apiPostForm
+                const fd = new FormData();
+                fd.append('doc_id', docId);
+                fd.append('file', file);
+                const res = await apiPostForm(KAVACH.DOCGUARD + '/verify', fd);
+
+                const panel = document.getElementById('ver-result');
+                const isTampered = res.is_tampered;
+                panel.className = 'result-card ' + (isTampered ? 'tampered' : 'valid');
+                panel.style.display = 'block';
+
+                document.getElementById('ver-title').textContent = isTampered ? '⚠ TAMPERING DETECTED' : '✓ Document Authentic';
+                document.getElementById('ver-title').style.color = isTampered ? '#FF3366' : '#00E676';
+                
+                // New SSIM display
+                document.getElementById('ver-score').textContent = (res.similarity || 0) + '%';
+                document.getElementById('ver-score-bar').style.width = (res.similarity || 0) + '%';
+                document.getElementById('ver-score-bar').style.background = isTampered ? '#FF3366' : '#00E676';
+                
+                document.getElementById('ver-added').textContent = res.added || 0;
+                document.getElementById('ver-removed').textContent = res.removed || 0;
+
+                // Show visual alert if pixel-level tampering found
+                if (res.visual_tampered) {
+                    document.getElementById('ver-visual-wrap').style.display = 'block';
+                    document.getElementById('ver-ssim').textContent = res.ssim_score;
+                } else {
+                    document.getElementById('ver-visual-wrap').style.display = 'none';
+                }
+
+                const diffEl = document.getElementById('ver-diff');
+                const diffData = res.diff || res.differences || [];
+                diffEl.innerHTML = diffData.map(d => {
+                    if (d.type === 'added') return `<span class="diff-word diff-added">+${d.text}</span> `;
+                    if (d.type === 'removed') return `<span class="diff-word diff-removed">-${d.text}</span> `;
+                    return `<span>${d.text} </span>`;
+                }).join('');
+            } catch(e) { alert('Verification failed: ' + e.message); }
+            finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-shield-alt"></i> Analyze for Tampering';
+            }
+        }
+
+        async function loadDocList() {
+            const container = document.getElementById('doc-list-container');
+            try {
+                const docs = await apiGet(KAVACH.DOCGUARD + '/list');
+                container.innerHTML = docs.map(d => `
+                    <div class="doc-list-item">
+                        <div>
+                            <div class="text-sm font-bold blue mono">${d.doc_id}</div>
+                            <div class="muted text-xs">${new Date(d.timestamp || d.registered_at || Date.now()).toLocaleString()}</div>
+                        </div>
+                        <button class="btn btn-outline btn-xs" onclick="prefillVerify('${d.doc_id}')">Verify</button>
+                    </div>
+                `).join('');
+            } catch(e) { container.innerHTML = 'Error loading list'; }
+        }
+
+        function prefillVerify(id) {
+            setMode('verify');
+            document.getElementById('ver-doc-id').value = id;
+        }
+
+        function onRegFileSelect(input) {
+            if (input.files.length) {
+                document.getElementById('reg-file-name').textContent = '📎 ' + input.files[0].name;
+                document.getElementById('reg-file-name').style.display = 'block';
+            }
+        }
+        function onVerFileSelect(input) {
+            if (input.files.length) {
+                document.getElementById('ver-file-name').textContent = '📎 ' + input.files[0].name;
+                document.getElementById('ver-file-name').style.display = 'block';
+            }
+        }
+        loadDocList();
+    </script>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html" class="active"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+</body>
+</html>

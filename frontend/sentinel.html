@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | Sentinel Surveillance</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <script src="js/emailjs-alert.js"></script>
+    <style>
+        .sentinel-grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; min-height: calc(100vh - 120px); }
+        .feed-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--t2); aspect-ratio: 16/9; }
+        #live-feed { width: 100%; height: 100%; object-fit: contain; display: none; }
+        .feed-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--t3); padding: 20px; text-align: center; }
+        .bbox { position: absolute; border: 2px solid; pointer-events: none; z-index: 10; transition: all 0.1s linear; }
+        .bbox-tag { position: absolute; top: -20px; left: -2px; padding: 2px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; white-space: nowrap; border-radius: 2px 2px 0 0; }
+        .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .kpi-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--t2); }
+        .kpi-val { font-size: 24px; font-weight: 700; margin-top: 5px; }
+        .sidebar-panel { background: var(--card-bg); border: 1px solid var(--t2); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; min-height: 400px; }
+        
+        @media (max-width: 1024px) {
+            .sentinel-grid { grid-template-columns: 1fr; height: auto; }
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .sidebar-panel { height: 400px; }
+            .top-header { flex-direction: column; align-items: flex-start !important; gap: 12px; }
+        }
+        @media (max-width: 480px) {
+            .kpi-row { grid-template-columns: 1fr; }
+        }
+        
+        .panel-header { padding: 12px 15px; border-bottom: 1px solid var(--t2); font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+        #alert-panel, #event-log { flex: 1; overflow-y: auto; padding: 10px; }
+        .alert-row { padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; gap: 12px; font-size: 11px; border: 1px solid rgba(255,255,255,0.05); animation: slideIn 0.3s ease; position: relative; }
+        .alert-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 4px 0 0 4px; }
+        .alert-row.critical { background: rgba(255,51,102,0.08); border-color: rgba(255,51,102,0.2); }
+        .alert-row.critical::before { background: var(--critical-red); }
+        .alert-row.warning { background: rgba(255,176,32,0.08); border-color: rgba(255,176,32,0.2); }
+        .alert-row.warning::before { background: #FFA500; }
+        .alert-time { font-size: 9px; opacity: 0.5; margin-top: 4px; }
+        .log-row { font-family: var(--font-mono); font-size: 10px; padding: 6px 0; border-bottom: 1px solid var(--t1); display: flex; gap: 10px; transition: 0.2s; }
+        .log-row:hover { background: rgba(255,255,255,0.02); }
+        .log-time { color: var(--cyber-blue); min-width: 70px; opacity: 0.7; }
+        .log-row.critical { color: var(--critical-red); font-weight: 600; }
+        .log-row.warning { color: #FFA500; }
+        .live-indicator { position: absolute; top: 15px; left: 15px; display: none; align-items: center; gap: 8px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 4px; font-size: 10px; font-weight: 700; z-index: 20; }
+        .sdot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item active"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+            <nav class="nav-group" style="margin-top:auto; padding-top:20px; border-top:1px solid rgba(255,255,255,0.05);">
+                <a href="#" onclick="sessionStorage.clear(); window.location.href='index.html';" class="nav-item" style="color:var(--critical-red);">
+                    <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <h1>Crowd Sentinel <span class="badge" id="anomaly-badge">0</span></h1>
+                    <p class="muted">Live YOLO Weapon Detection & Threat Analysis</p>
+                </div>
+                <div class="header-right">
+                    <div id="clock" class="mono text-xs muted">--:--:-- UTC</div>
+                    <div class="status-pill" id="feed-status-pill">
+                        <span class="sdot"></span>
+                        <span id="feed-status-text">FEED OFFLINE</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="kpi-row">
+                <div class="kpi-card">
+                    <div class="kpi-label">Context Objects</div>
+                    <div class="kpi-value" id="kpi-persons">0</div>
+                    <div id="kpi-obj-tags" style="font-size:9px; opacity:0.7; margin-top:4px; line-height:1.6;"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Active Threats</div>
+                    <div class="kpi-value accent-red" id="kpi-anomalies">0</div>
+                    <div id="kpi-threat-tags" style="font-size:9px; color:#FF3366; margin-top:4px; line-height:1.6;"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Risk Score</div>
+                    <div class="kpi-value" id="kpi-alerts-count">0%</div>
+                </div>
+                <div class="kpi-card" style="border: 1px solid var(--red); background: rgba(255, 51, 102, 0.05);">
+                    <div class="muted text-xs">EMERGENCY DISPATCH</div>
+                    <button class="btn btn-primary btn-sm mt-2 w-full" id="manual-alert-btn" onclick="sendAlertToAll(100, 'CRITICAL', 'Manual Emergency Alert triggered from Sentinel Surveillance.')">
+                        🚨 SEND ALERT
+                    </button>
+                </div>
+            </div>
+
+            <div class="sentinel-grid">
+                <div class="feed-section">
+                    <div class="feed-container" id="feed-wrap">
+                        <div class="live-indicator" id="live-badge">
+                            <span class="sdot" style="animation: pulse 1.5s infinite"></span>
+                            REC · LIVE STREAM
+                        </div>
+                        <img id="live-feed" src="" alt="Live Stream" style="display:none; width:100%; height:100%; object-fit:contain;">
+                        <video id="browser-cam" autoplay playsinline muted style="display:none; width:100%; height:100%; object-fit:contain;"></video>
+                        <canvas id="overlay-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:5;"></canvas>
+                        <canvas id="capture-canvas" style="display:none;"></canvas>
+
+                        <div class="feed-placeholder" id="feed-placeholder">
+                            <i class="fas fa-video-slash fa-3x mb-4"></i>
+                            <p>NO FEED CONNECTED</p>
+                            <div class="mt-6 flex gap-4">
+                                <select id="src-preset" class="btn btn-outline btn-sm" onchange="applyPreset()">
+                                    <option value="browser">Browser Webcam (Direct)</option>
+                                    <option value="0">Local Backend Cam (0)</option>
+                                    <option value="1">External Backend Cam (1)</option>
+                                    <option value="demo.mp4">Demo Video</option>
+                                </select>
+                                <input type="text" id="src-input" value="browser" class="btn btn-outline btn-sm" style="width:80px; text-align:center">
+                                <button class="btn btn-primary btn-sm" onclick="startFeed()">START STREAM</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mt-6" style="height: 200px; display:flex; flex-direction:column">
+                        <div class="panel-header">
+                            <span>SYSTEM EVENT LOG</span>
+                            <button class="btn btn-outline btn-xs" onclick="clearLog()">CLEAR</button>
+                        </div>
+                        <div id="event-log" style="flex:1; overflow-y:auto; padding:10px;"></div>
+                    </div>
+                </div>
+
+                <div class="sidebar-panel">
+                    <div class="panel-header">
+                        <span id="alert-count">0 alerts</span>
+                        <button class="btn btn-outline btn-xs" onclick="clearAlerts()">CLEAR</button>
+                    </div>
+                    <div id="alert-panel">
+                        <div class="muted text-xs" style="text-align:center; padding:20px">
+                            No security incidents detected.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html" class="active"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+    const SENTINEL = KAVACH.SENTINEL;
+    let alertCount = 0;
+    let isProcessing = false;
+    let lastCaptureTime = 0;
+    let streamActive = false;
+
+    // Clock
+    setInterval(() => {
+      document.getElementById('clock').textContent =
+        new Date().toUTCString().slice(5,25) + ' UTC';
+    }, 1000);
+
+    // ── WebSocket for real-time alerts from sentinel ──────────────────────────────
+    function connectWS() {
+      sentinelWS = new WebSocket(KAVACH.WS_URL);
+
+      sentinelWS.onopen = () => {
+        document.getElementById('feed-status-text').textContent = 'WS CONNECTED';
+        addLog('info', 'WebSocket connected to KAVACH Sentinel');
+      };
+
+      sentinelWS.onmessage = (ev) => {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'ping') return;
+
+        // New system payload
+        if (data.type === 'threat_update') {
+          const intel = data.data;
+          updateKPIs(intel.detections || [], intel.risk_score || 0);
+          
+          if (intel.weapon_detected || intel.suspicious_activity) {
+            const msg = intel.weapon_detected ? `🚨 WEAPON: ${intel.weapon_type}` : `⚠️ SUSPICIOUS ACTIVITY`;
+            addAlert({
+              severity: intel.risk_level,
+              message: msg,
+              object: intel.weapon_detected ? intel.weapon_type : 'BEHAVIOR',
+              risk_score: intel.risk_score,
+              action: intel.risk_score >= 80 ? 'FIR_TRIGGERED' : 'MONITORING'
+            });
+
+            // Auto-send Email alert for weapons or high risk
+            if (intel.weapon_detected || intel.risk_score >= 80) {
+              autoTriggerAlert(intel.risk_score, intel.risk_level || 'CRITICAL', `Sentinel Detection: ${msg}`, `sentinel-${Date.now()}`);
+            }
+          }
+          return;
+        }
+
+        if (data.type === 'FIR_CREATED') {
+          addAlert({
+            severity: 'critical',
+            message: `🚨 Auto-FIR Created: ${data.fir_id} — ${data.message}`,
+            image_url: data.image_url
+          });
+          addLog('critical', `FIR auto-generated: ${data.fir_id}`);
+          if (data.image_url) renderCapturedImage(data.image_url);
+          showThreatPopup(data);
+          return;
+        }
+
+        // ── CRITICAL_ALERT: full auto-FIR pipeline result ────────────────────
+        if (data.type === 'CRITICAL_ALERT') {
+          addAlert({
+            severity: 'critical',
+            message: data.message,
+            risk_score: data.risk_score,
+            action: `FIR: ${data.fir_id || 'pending'}`
+          });
+          addLog('critical', `[AUTO-FIR] ${data.message} | FIR: ${data.fir_id || 'N/A'} | Score: ${data.risk_score}`);
+          if (data.image_url) renderCapturedImage(data.image_url);
+          showThreatPopup({
+            title:       data.title || '🚨 CRITICAL ALERT',
+            message:     data.message,
+            sub_message: data.sub_message,
+            fir_id:      data.fir_id,
+            risk_score:  data.risk_score,
+            risk_level:  data.risk_level,
+            image_url:   data.image_url,
+          });
+          return;
+        }
+      };
+
+      sentinelWS.onclose = () => {
+        const feedText = document.getElementById('feed-status-text');
+        if (feedText) feedText.textContent = 'WS RECONNECTING...';
+        setTimeout(connectWS, 3000);
+      };
+      sentinelWS.onerror = () => sentinelWS.close();
+    }
+
+    // ── Connect live feed ─────────────────────────────────────────────────────────
+    let browserStream = null;
+    let browserInterval = null;
+
+    async function startFeed() {
+      const srcInput = document.getElementById('src-input');
+      const src = srcInput ? srcInput.value.trim() : 'browser';
+      const img = document.getElementById('live-feed');
+      const video = document.getElementById('browser-cam');
+      const placeholder = document.getElementById('feed-placeholder');
+      const badge = document.getElementById('live-badge');
+      const statusText = document.getElementById('feed-status-text');
+      const statusPill = document.getElementById('feed-status-pill');
+
+      stopFeed(); // Clean up existing
+
+      if (src === 'browser') {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          const msg = 'Camera API not available. Use localhost or HTTPS.';
+          addLog('critical', msg);
+          alert('SECURITY ERROR: Camera access is blocked because this is an insecure context.\n\nFIX: Open http://localhost:3000 instead of an IP address.');
+          return;
+        }
+        try {
+          browserStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+          video.srcObject = browserStream;
+          video.style.display = 'block';
+          img.style.display = 'none';
+
+          video.onerror = (e) => {
+            console.error('[CAM] Video error:', e);
+            addLog('critical', 'Camera stream error occurred');
+          };
+          
+          streamActive = true;
+          requestAnimationFrame(analyzeBrowserLoop);
+          addLog('info', 'Browser camera connected');
+        } catch (err) {
+          addLog('critical', 'Camera access denied: ' + err.message);
+          return;
+        }
+      } else {
+        if (img) {
+            img.src = `${SENTINEL}/stream?src=${encodeURIComponent(src)}`;
+            img.style.display = 'block';
+            video.style.display = 'none';
+        }
+        addLog('info', `Feed connected: source ${src}`);
+        // Start polling detections for bounding boxes
+        if (window._detPoll) clearInterval(window._detPoll);
+        window._detPoll = setInterval(pollDetections, 2000);
+      }
+
+      if (placeholder) placeholder.style.display = 'none';
+      if (badge) badge.style.display = 'flex';
+      if (statusText) statusText.textContent = 'LIVE';
+      if (statusPill) {
+          statusPill.querySelector('.sdot').style.cssText =
+            'background:var(--green);box-shadow:0 0 7px var(--green)';
+      }
+
+      // Connect WebSocket for alerts
+      if (!sentinelWS || sentinelWS.readyState > 1) connectWS();
+    }
+
+    function stopFeed() {
+      const img = document.getElementById('live-feed');
+      const video = document.getElementById('browser-cam');
+      const placeholder = document.getElementById('feed-placeholder');
+      const badge = document.getElementById('live-badge');
+      const statusText = document.getElementById('feed-status-text');
+      const statusPill = document.getElementById('feed-status-pill');
+
+      if (img) {
+          img.src = '';
+          img.style.display = 'none';
+      }
+      if (video) {
+        video.style.display = 'none';
+        video.srcObject = null;
+      }
+      if (browserStream) {
+        browserStream.getTracks().forEach(track => track.stop());
+        browserStream = null;
+      }
+      if (browserInterval) {
+        clearInterval(browserInterval);
+        browserInterval = null;
+      }
+      streamActive = false;
+
+      if (placeholder) placeholder.style.display = 'flex';
+      if (badge) badge.style.display = 'none';
+      if (statusText) statusText.textContent = 'FEED OFFLINE';
+      if (statusPill) {
+          statusPill.querySelector('.sdot').style.cssText =
+            'background:var(--t3);box-shadow:none';
+      }
+      if (window._detPoll) clearInterval(window._detPoll);
+      removeBBoxes();
+    }
+
+    async function analyzeBrowserLoop() {
+      if (!streamActive) return;
+
+      const now = Date.now();
+      if (now - lastCaptureTime >= 500 && !isProcessing) {
+        lastCaptureTime = now;
+        analyzeBrowserFrame(); // Non-blocking
+      }
+      requestAnimationFrame(analyzeBrowserLoop);
+    }
+
+    async function analyzeBrowserFrame() {
+      const video = document.getElementById('browser-cam');
+      const canvas = document.getElementById('capture-canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!video || !video.videoWidth || !canvas || video.readyState < 2) return;
+
+      isProcessing = true;
+      console.log('[CAM] Capturing frame');
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const imageData = canvas.toDataURL('image/jpeg', 0.6);
+        
+        console.log('[API] Sending');
+        const resp = await fetch(`${SENTINEL}/analyze_frame`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...authHeaders()
+          },
+          body: JSON.stringify({ image: imageData }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === 'success') {
+            renderBBoxes(data.detections || []);
+            updateKPIs(data.detections || [], data.risk_score || 0, data.detected_objects || []);
+
+            // Log weapon detections immediately
+            if (data.weapon_detected && data.weapon_type) {
+              const msg = `🚨 WEAPON: ${data.weapon_type.toUpperCase()}`;
+              addLog('critical', `🔫 WEAPON DETECTED: ${data.weapon_type.toUpperCase()} (${Math.round((data.confidence||0)*100)}% conf)`);
+              addAlert({
+                severity: 'critical',
+                message: msg,
+                risk_score: data.risk_score,
+                action: 'AUTO-FIR TRIGGERED'
+              });
+              // Auto-trigger Email alert
+              autoTriggerAlert(data.risk_score, 'CRITICAL', `Sentinel Browser-Cam: ${msg}`, `cam-${Date.now()}`);
+            }
+          }
+        }
+      } catch (e) { 
+        if (e.name === 'AbortError') {
+          console.warn('[API] Request timed out');
+        } else {
+          console.error('[API] Error:', e.message);
+        }
+      } finally {
+        isProcessing = false;
+      }
+    }
+
+    function updateKPIs(detections = [], riskScore = 0, detectedObjects = []) {
+      const safeDets = Array.isArray(detections) ? detections : [];
+      const safeObjs = Array.isArray(detectedObjects) ? detectedObjects : [];
+
+      const contextDets = safeObjs.filter(d => d.type === 'context');
+      const threatDets  = safeObjs.filter(d => d.type === 'threat');
+
+      // Fallback to raw detections if detected_objects not available
+      const ctxCount = contextDets.length || safeDets.filter(d => d && d.type === 'context').length;
+      const tCount   = threatDets.length  || safeDets.filter(d => d && d.type === 'threat').length;
+
+      const kpiPersons = document.getElementById('kpi-persons');
+      const kpiThreats = document.getElementById('kpi-anomalies');
+      const kpiScore   = document.getElementById('kpi-alerts-count');
+      const objTags    = document.getElementById('kpi-obj-tags');
+      const threatTags = document.getElementById('kpi-threat-tags');
+
+      if (kpiPersons) kpiPersons.textContent = ctxCount;
+      if (kpiThreats) kpiThreats.textContent = tCount;
+      if (kpiScore && riskScore !== undefined) {
+        kpiScore.textContent = Math.round(riskScore) + '%';
+        kpiScore.className = `kpi-value ${riskScore > 70 ? 'accent-red' : (riskScore > 30 ? 'accent-orange' : '')}`;
+      }
+
+      // Render object label tags
+      if (objTags) {
+        const labels = contextDets.map(d => `${d.label} (${Math.round(d.confidence*100)}%)`);
+        objTags.innerHTML = labels.length
+          ? labels.map(l => `<span style="background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);padding:1px 5px;border-radius:3px;margin:1px;display:inline-block">${l}</span>`).join('')
+          : '';
+      }
+      if (threatTags) {
+        const tlabels = threatDets.map(d => `⚠ ${d.label} (${Math.round(d.confidence*100)}%)`);
+        threatTags.innerHTML = tlabels.length
+          ? tlabels.map(l => `<span style="background:rgba(255,51,102,0.15);border:1px solid rgba(255,51,102,0.4);padding:1px 5px;border-radius:3px;margin:1px;display:inline-block">${l}</span>`).join('')
+          : '';
+      }
+    }
+
+    // ── Poll detections every 2s → update UI ────────────────────────────────────
+    async function pollDetections() {
+      try {
+        const d = await getSentinelDetections();
+        if (d.status === 'success') {
+          renderBBoxes(d.detections || []);
+          updateKPIs(d.detections || [], d.risk_score || 0);
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    function removeBBoxes() {
+      const canvas = document.getElementById('overlay-canvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    function renderBBoxes(detections) {
+      const canvas = document.getElementById('overlay-canvas');
+      const video = document.getElementById('browser-cam');
+      if (!canvas || !video || video.style.display === 'none') return;
+
+      const ctx = canvas.getContext('2d');
+      // Sync canvas size with displayed video size
+      const vw = video.clientWidth || 640;
+      const vh = video.clientHeight || 480;
+      
+      if (canvas.width !== vw || canvas.height !== vh) {
+        canvas.width = vw;
+        canvas.height = vh;
+      }
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const safeDets = Array.isArray(detections) ? detections : [];
+      safeDets.forEach(det => {
+        if (!det || !det.bbox || !Array.isArray(det.bbox)) return;
+        const [x, y, w, h] = det.bbox;
+        const bx = x * canvas.width;
+        const by = y * canvas.height;
+        const bw = w * canvas.width;
+        const bh = h * canvas.height;
+
+        const isThreat = det.type === 'threat' || (det.label && /gunting|scissors|pistol|weapon/i.test(det.label));
+        const color = isThreat ? '#FF3366' : '#00E676'; // Use hex instead of CSS vars
+        
+        // Draw Glow
+        ctx.shadowBlur = isThreat ? 15 : 0;
+        ctx.shadowColor = isThreat ? 'rgba(255, 51, 102, 0.8)' : 'transparent';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = isThreat ? 3 : 2;
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.shadowBlur = 0;
+
+        // Label Background
+        const labelText = (det.label || 'Unknown').toUpperCase();
+        const confText = det.confidence ? `${Math.round(det.confidence * 100)}%` : '';
+        const fullLabel = `${labelText} ${confText}`;
+        
+        ctx.font = 'bold 13px Inter, sans-serif';
+        const textMetrics = ctx.measureText(fullLabel);
+        const textWidth = textMetrics.width;
+        
+        // Draw label pill
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        const rw = textWidth + 16;
+        const rh = 24;
+        const rx = bx;
+        const ry = by - rh;
+        ctx.roundRect(rx, ry, rw, rh, [4, 4, 0, 0]);
+        ctx.fill();
+
+        // Draw text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(fullLabel, bx + 8, by - 8);
+      });
+    }
+
+
+    function renderCapturedImage(url) {
+      const panel = document.getElementById('alert-panel');
+      if (!panel) return;
+      const div = document.createElement('div');
+      div.className = 'alert-row critical';
+      div.innerHTML = `
+        <div class="alert-icon">📸</div>
+        <div style="flex:1">
+          <div class="alert-msg">Evidence captured</div>
+          <a href="${url}" target="_blank" rel="noopener"
+             style="font-size:8px;color:var(--blue)">View image ↗</a>
+        </div>`;
+      panel.prepend(div);
+    }
+
+    function addAlert(a) {
+      alertCount++;
+      const anomalyBadge = document.getElementById('anomaly-badge');
+      const alertCountEl = document.getElementById('alert-count');
+      const panel = document.getElementById('alert-panel');
+      
+      if (anomalyBadge) anomalyBadge.textContent = alertCount;
+      if (alertCountEl) alertCountEl.textContent = alertCount + ' alerts';
+      if (!panel) return;
+      
+      const row = document.createElement('div');
+      const sev = (a.severity || '').toUpperCase();
+      const statusClass = (sev === 'CRITICAL' || sev === 'HIGH') ? 'critical' : 'warning';
+      
+      row.className = `alert-row ${statusClass}`;
+      row.innerHTML = `
+        <div class="alert-icon">${sev === 'CRITICAL' ? '🔴' : sev === 'HIGH' ? '🟡' : '🔵'}</div>
+        <div style="width: 100%">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+            <span class="badge badge-xs">${a.object || 'UNKNOWN'}</span>
+            <span class="text-xs mono" style="opacity:0.7">${a.camera_id || 'CAM_0'}</span>
+          </div>
+          <div class="alert-msg" style="font-weight:700; margin-bottom:2px">${a.message || a.type}</div>
+          <div style="display:flex; gap:10px; font-size:9px; opacity:0.8">
+            <span>RISK: <b>${a.risk_score || 0}%</b></span>
+            <span>LEVEL: <b>${sev}</b></span>
+            <span>ACTION: <b style="color:var(--blue)">${a.action || 'LOGGED'}</b></span>
+          </div>
+          <div class="alert-time" style="margin-top:6px">${new Date().toLocaleTimeString()}</div>
+        </div>`;
+      
+      panel.prepend(row);
+      if (panel.children.length > 15) panel.lastChild.remove();
+    }
+
+    function addLog(type, msg) {
+      const log = document.getElementById('event-log');
+      if (!log) return;
+      const row = document.createElement('div');
+      row.className = `log-row ${type}`;
+      row.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span>
+                       <span>${msg}</span>`;
+      log.prepend(row);
+      if (log.children.length > 60) log.lastChild.remove();
+    }
+
+    function clearAlerts() {
+      alertCount = 0;
+      const panel = document.getElementById('alert-panel');
+      const anomalyBadge = document.getElementById('anomaly-badge');
+      const alertCountEl = document.getElementById('alert-count');
+      
+      if (panel) panel.innerHTML = '<div class="muted text-xs" style="text-align:center;padding:16px">Cleared</div>';
+      if (anomalyBadge) anomalyBadge.textContent = 0;
+      if (alertCountEl) alertCountEl.textContent = '0 alerts';
+    }
+
+    function clearLog() { 
+        const log = document.getElementById('event-log');
+        if (log) log.innerHTML = ''; 
+    }
+
+    function applyPreset() {
+      const srcInput = document.getElementById('src-input');
+      const srcPreset = document.getElementById('src-preset');
+      if (srcInput && srcPreset) srcInput.value = srcPreset.value;
+    }
+
+    checkHealth('sentinel').then(d => {
+      if (d.status === 'online') {
+        addLog('info', `Sentinel online — Risk: ${d.risk_score}%`);
+      }
+    }).catch(() => addLog('warning', 'Sentinel offline — check backend status'));
+    function showThreatPopup(data) {
+      // Remove existing if any
+      const old = document.getElementById('threat-popup');
+      if (old) old.remove();
+
+      const popup = document.createElement('div');
+      popup.id = 'threat-popup';
+      popup.style.cssText = `
+        position: fixed; top: 20px; right: 20px; width: 340px; 
+        background: rgba(20, 0, 0, 0.95); border: 2px solid var(--red);
+        border-radius: 12px; padding: 20px; z-index: 9999;
+        box-shadow: 0 0 30px rgba(255, 51, 102, 0.4);
+        backdrop-filter: blur(10px); color: #fff;
+        animation: popupIn 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      `;
+
+      popup.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px">
+          <div style="font-size:24px; animation: pulse 1s infinite">🚨</div>
+          <div style="font-weight:900; font-size:16px; letter-spacing:1px; color:var(--red)">CRITICAL THREAT DETECTED</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:8px; margin-bottom:15px">
+          <div style="font-size:12px; opacity:0.7; margin-bottom:4px">DETECTED OBJECT</div>
+          <div style="font-size:18px; font-weight:700">${(data.object || 'Weapon').toUpperCase()}</div>
+        </div>
+        <div style="font-size:13px; line-height:1.5; margin-bottom:15px">
+          Automated FIR <b>${data.fir_id || 'PENDING'}</b> has been generated and anchored to the blockchain.
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px">
+          <div style="background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; text-align:center">
+            <div style="font-size:9px; opacity:0.6">RISK SCORE</div>
+            <div style="font-size:14px; font-weight:700; color:var(--red)">${data.risk_score || 100}%</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; text-align:center">
+            <div style="font-size:9px; opacity:0.6">TIMESTAMP</div>
+            <div style="font-size:11px; font-weight:700">${new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px">
+          <a href="fir.html?id=${data.fir_id}" class="btn btn-primary btn-sm" style="flex:1; text-align:center; font-size:10px">VIEW FIR</a>
+          <button class="btn btn-outline btn-sm" onclick="this.parentElement.parentElement.remove()" style="flex:1; font-size:10px">DISMISS</button>
+        </div>
+      `;
+
+      // Add keyframes if not exists
+      if (!document.getElementById('popup-style')) {
+        const s = document.createElement('style');
+        s.id = 'popup-style';
+        s.textContent = `
+          @keyframes popupIn { from { opacity:0; transform:translateX(50px) scale(0.9); } to { opacity:1; transform:translateX(0) scale(1); } }
+          @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        `;
+        document.head.appendChild(s);
+      }
+
+      document.body.appendChild(popup);
+      
+      // Auto remove after 10s
+      setTimeout(() => { if (popup.parentElement) popup.remove(); }, 10000);
+    }
+    </script>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html" class="active"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+</body>
+</html>

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | DeepTrace Forensic</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <style>
+        .dropzone {
+            border: 2px dashed rgba(255,255,255,0.12);
+            border-radius: 12px; padding: 40px 20px; text-align: center;
+            cursor: pointer; transition: all 0.2s; position: relative;
+        }
+        .dropzone:hover, .dropzone.drag-over {
+            border-color: var(--cyber-blue);
+            background: rgba(0,210,255,0.04);
+        }
+        .dropzone input[type=file] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+        }
+        .result-panel {
+            display: none; margin-top: 24px;
+        }
+        .verdict-box {
+            padding: 24px; border-radius: 12px; text-align: center;
+            margin-bottom: 24px;
+        }
+        .verdict-box.fake { background: rgba(255,51,102,0.1); border: 1px solid rgba(255,51,102,0.3); }
+        .verdict-box.real { background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.3); }
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+            padding: 16px; border-radius: 10px; text-align: center;
+        }
+        .signal-bar-wrap { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .signal-fill { height: 100%; transition: width 1s ease; }
+
+        @media (max-width: 1024px) {
+            .dt-main-grid { grid-template-columns: 1fr !important; }
+            .stat-grid { grid-template-columns: 1fr; }
+            .dropzone { padding: 30px 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item active"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header style="margin-bottom:28px;">
+                <h1 style="font-size:24px; font-weight:700;">DeepTrace — Forensic Analysis</h1>
+                <p class="muted" style="margin-top:4px;">Deepfake detection for video and image evidence.</p>
+            </header>
+
+            <div class="dt-main-grid" style="display:grid; grid-template-columns: 1fr 1.5fr; gap:24px;">
+                <!-- Left: Upload Section -->
+                <div>
+                    <div class="card">
+                        <h3 style="font-size:15px; font-weight:700; margin-bottom:16px;">Evidence Upload</h3>
+                        <div style="display:flex; gap:10px; margin-bottom:20px;">
+                            <button class="btn btn-outline btn-sm active" id="mode-video" onclick="setMode('video')">🎬 Video</button>
+                            <button class="btn btn-outline btn-sm" id="mode-image" onclick="setMode('image')">🖼 Image</button>
+                        </div>
+
+                        <div class="dropzone" id="dt-dropzone">
+                            <input type="file" id="dt-file" onchange="onFileSelect(this)">
+                            <i id="dz-icon" class="fas fa-video" style="font-size:36px; color:var(--cyber-blue); margin-bottom:14px; display:block;"></i>
+                            <div id="dz-text" style="font-size:14px; font-weight:600;">Drop Video Evidence</div>
+                            <p class="muted" id="dz-hint" style="font-size:12px; margin-top:6px;">MP4, AVI, MKV — max 500MB</p>
+                            <div id="dt-file-name" style="margin-top:12px; color:var(--cyber-blue); font-size:13px; display:none; font-family:var(--font-mono);"></div>
+                        </div>
+
+                        <button class="btn btn-primary" style="margin-top:20px; width:100%;" onclick="runAnalysis()" id="analyze-btn">
+                            <i class="fas fa-microscope"></i> Run Forensic Scan
+                        </button>
+
+                        <div id="dt-progress" style="display:none; margin-top:20px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                                <span class="muted" style="font-size:11px;" id="progress-label">Analyzing frames...</span>
+                                <span class="mono" style="font-size:11px;" id="progress-pct">0%</span>
+                            </div>
+                            <div class="signal-bar-wrap" style="height:4px; margin-top:0;">
+                                <div class="signal-fill" id="progress-bar" style="width:0%; background:var(--cyber-blue);"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top:24px;">
+                        <h3 style="font-size:14px; font-weight:600; margin-bottom:16px;">Forensic History</h3>
+                        <div id="dt-history" style="display:flex; flex-direction:column; gap:10px;">
+                            <div class="muted" style="font-size:12px; text-align:center; padding:20px;">No recent scans.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Results Section -->
+                <div>
+                    <div class="card" style="margin-bottom:20px; padding:15px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div class="pulse-indicator" id="ai-status-pulse"></div>
+                                <span style="font-size:13px; font-weight:600;">DeepTrace AI Engine</span>
+                            </div>
+                            <span id="ai-status-text" class="badge" style="background:rgba(0,230,118,0.1); color:#00E676;">CONNECTED</span>
+                        </div>
+                    </div>
+                    <div id="results-placeholder" class="card" style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:60px;">
+                        <i class="fas fa-fingerprint" style="font-size:48px; opacity:0.1; margin-bottom:20px;"></i>
+                        <p class="muted">Upload a file and start the scan to see deepfake forensic results here.</p>
+                    </div>
+
+                    <div id="results-panel" class="result-panel">
+                        <div id="verdict-card" class="verdict-box">
+                            <h2 id="verdict-title" style="font-size:24px; font-weight:800; margin-bottom:4px;">—</h2>
+                            <p id="verdict-conf" class="muted" style="font-size:14px;"></p>
+                        </div>
+
+
+                        <div class="bento-grid">
+                            <div class="stat-card">
+                                <div class="muted" style="font-size:10px; text-transform:uppercase;">Fake Probability</div>
+                                <div id="stat-fake-prob" style="font-size:24px; font-weight:800; margin-top:4px;">—</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="muted" style="font-size:10px; text-transform:uppercase;">Frame Count</div>
+                                <div id="stat-frames" style="font-size:24px; font-weight:800; margin-top:4px;">—</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="muted" style="font-size:10px; text-transform:uppercase;">Artifacts</div>
+                                <div id="stat-artifacts" style="font-size:24px; font-weight:800; margin-top:4px; color:var(--critical-red);">—</div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:24px;">
+                            <h3 style="font-size:14px; font-weight:600; margin-bottom:16px;">Signal Analysis</h3>
+                            <div id="signal-list" style="display:flex; flex-direction:column; gap:16px;">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 style="font-size:14px; font-weight:600; margin-bottom:16px;">Frame Analysis (Anomalies)</h3>
+                            <div class="table-container">
+                                <table style="font-size:12px;">
+                                    <thead>
+                                        <tr>
+                                            <th>Frame #</th>
+                                            <th>CNN Score</th>
+                                            <th>FFT Anomaly</th>
+                                            <th>Confidence</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="frame-tbody">
+                                        <!-- Injected by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html" class="active"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+        let currentMode = 'video';
+        function setMode(m) {
+            currentMode = m;
+            document.getElementById('mode-video').classList.toggle('active', m==='video');
+            document.getElementById('mode-image').classList.toggle('active', m==='image');
+        }
+
+        async function runAnalysis() {
+            const fileInput = document.getElementById('dt-file');
+            if (!fileInput.files.length) return alert('Select evidence');
+            
+            const btn = document.getElementById('analyze-btn');
+            const progress = document.getElementById('dt-progress');
+            const bar = document.getElementById('progress-bar');
+            const label = document.getElementById('progress-label');
+
+            btn.disabled = true;
+            progress.style.display = 'block';
+            bar.style.width = '20%';
+            label.textContent = 'Uploading...';
+
+            try {
+                const file = fileInput.files[0];
+                let res;
+                if (currentMode === 'video') {
+                    res = await analyzeVideo(file);
+                } else {
+                    res = await analyzeImage(file);
+                }
+
+                bar.style.width = '100%';
+                label.textContent = 'Analysis Complete';
+                renderResults(res);
+            } catch(e) { 
+                alert('Analysis failed: ' + e.message);
+                progress.style.display = 'none';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function renderResults(res) {
+            document.getElementById('results-placeholder').style.display = 'none';
+            document.getElementById('results-panel').style.display = 'block';
+
+            const card = document.getElementById('verdict-card');
+            const title = document.getElementById('verdict-title');
+            const isFake = res.is_fake;
+            const isInconclusive = res.is_inconclusive;
+
+            if (isInconclusive) {
+                card.className = 'verdict-box';
+                card.style.background = 'rgba(255,255,255,0.05)';
+                title.textContent = '⚠ INCONCLUSIVE ANALYSIS';
+                title.style.color = '#FFA726';
+            } else {
+                card.className = 'verdict-box ' + (isFake ? 'fake' : 'real');
+                title.textContent = isFake ? '⚠ DEEPFAKE DETECTED' : '✓ AUTHENTIC MEDIA';
+                title.style.color = isFake ? '#FF3366' : '#00E676';
+            }
+            
+            const confPct = Math.round((res.confidence || 0) * 100);
+            document.getElementById('verdict-conf').innerHTML = `
+                <div style="margin-bottom:6px;">AI Confidence: ${confPct}%</div>
+                <div style="font-size:13px; font-weight:600; color:${isInconclusive ? '#FFA726' : (isFake ? '#FF3366' : '#00E676')}; 
+                            padding:8px 16px; background:rgba(255,255,255,0.04); 
+                            border-radius:8px; margin:8px 0;">
+                    ${res.decision || ''}
+                </div>
+                <div style="font-size:11px; color:#888; margin-top:4px;">
+                    Fraud Risk Contribution: 
+                    <span style="color:${res.fraud_risk_signal > 0.5 ? '#FF3366' : '#00E676'}; font-weight:700;">
+                        ${Math.round((res.fraud_risk_signal || 0) * 100)}%
+                    </span>
+                </div>
+                ${res.pdf_report_url ? `<br><a href="${KAVACH.DEEPTRACE}${res.pdf_report_url}" 
+                    target="_blank" style="color:#00D2FF; text-decoration:underline; font-size:12px;">
+                    <i class="fas fa-file-pdf"></i> Download Forensic PDF</a>` : ''}
+            `;
+
+            document.getElementById('stat-fake-prob').textContent = Math.round(res.fake_prob * 100) + '%';
+            document.getElementById('stat-frames').textContent = res.frames_analyzed || res.frame_count;
+            document.getElementById('stat-artifacts').textContent = res.artifacts;
+
+            // Signal Analysis
+            const signals = res.signals || [];
+            document.getElementById('signal-list').innerHTML = signals.map(s => `
+                <div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <span class="text-xs font-bold" style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">${s.name}</span>
+                        <span class="mono text-xs" style="font-size:11px;">${Math.round(s.score * 100)}%</span>
+                    </div>
+                    <div class="signal-bar-wrap">
+                        <div class="signal-fill" style="width:${s.score * 100}%; background:${s.score > 0.5 ? 'var(--critical-red)' : 'var(--accent-green)'}"></div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Frame Breakdown
+            const tbody = document.getElementById('frame-tbody');
+            const results = res.per_frame_results || [];
+            
+            if (results.length === 0 || res.total_faces_found === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="muted" style="text-align:center; padding:20px;">No human faces detected in this file.</td></tr>`;
+            } else {
+                tbody.innerHTML = results.map(f => {
+                    if (f.faces_detected === 0) return '';
+                    const s = f.scores[0] || { cnn: 0, fft: 0 };
+                    const prob = f.frame_fake_prob;
+                    return `
+                        <tr>
+                            <td class="mono">#${f.frame_index}</td>
+                            <td>${Math.round(s.cnn * 100)}%</td>
+                            <td>${Math.round(s.fft * 100)}%</td>
+                            <td>
+                                <span class="badge ${prob > 0.5 ? 'badge-critical' : 'badge-low'}">
+                                    ${Math.round(prob * 100)}% ${prob > 0.5 ? 'SUSPICIOUS' : 'CLEAN'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        function onFileSelect(input) {
+            if (input.files.length) {
+                document.getElementById('dt-file-name').textContent = '📎 ' + input.files[0].name;
+                document.getElementById('dt-file-name').style.display = 'block';
+            }
+        }
+        async function checkAIHealth() {
+            const pulse = document.getElementById('ai-status-pulse');
+            const text = document.getElementById('ai-status-text');
+            try {
+                // Try to get stats as a health check
+                const res = await KAVACH.API.GET('proxy/deeptrace/stats');
+                text.textContent = 'CONNECTED';
+                text.style.color = '#00E676';
+                text.style.background = 'rgba(0,230,118,0.1)';
+                pulse.style.background = '#00E676';
+                pulse.style.boxShadow = '0 0 10px #00E676';
+            } catch(e) {
+                text.textContent = 'DISCONNECTED';
+                text.style.color = '#FF3366';
+                text.style.background = 'rgba(255,51,102,0.1)';
+                pulse.style.background = '#FF3366';
+                pulse.style.boxShadow = '0 0 10px #FF3366';
+            }
+        }
+        setInterval(checkAIHealth, 5000);
+        checkAIHealth();
+    </script>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html" class="active"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+</body>
+</html>

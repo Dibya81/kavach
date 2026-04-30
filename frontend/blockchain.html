@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | Blockchain Audit</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <style>
+        .chain-stat {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 12px;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .chain-stat .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+        .chain-stat .value { font-size: 26px; font-weight: 800; font-family: var(--font-mono); color: var(--cyber-blue); }
+        .chain-stat .sub   { font-size: 11px; color: var(--text-muted); }
+        .network-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 20px;
+            font-size: 11px; font-weight: 700;
+            background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.3);
+            color: var(--safe-green);
+        }
+        .network-badge.mock {
+            background: rgba(255,176,32,0.1); border-color: rgba(255,176,32,0.3); color: #FFB020;
+        }
+        .timeline-scroll {
+            display: flex; gap: 16px; overflow-x: auto;
+            padding: 16px 0 20px; margin-bottom: 8px;
+        }
+        .timeline-card {
+            min-width: 200px; padding: 14px 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            position: relative;
+        }
+        .timeline-card::after {
+            content: "→"; position: absolute; right: -16px; top: 50%;
+            transform: translateY(-50%); color: rgba(255,255,255,0.2); font-size: 14px;
+        }
+        .timeline-card:last-child::after { display: none; }
+        .copy-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-muted); font-size: 11px; padding: 2px 6px;
+        }
+        .copy-btn:hover { color: var(--cyber-blue); }
+
+        @media (max-width: 1024px) {
+            .bc-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            header { flex-direction: column; align-items: flex-start !important; gap: 12px; }
+        }
+        @media (max-width: 480px) {
+            .bc-stat-grid { grid-template-columns: 1fr !important; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="neural-canvas" style="position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:0.5;"></canvas>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item active"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:28px;">
+                <div>
+                    <h1 style="font-size:24px; font-weight:700;">Blockchain Immutable Audit</h1>
+                    <p class="muted" style="margin-top:4px;">Cryptographic proof of every FIR anchored on-chain.</p>
+                </div>
+                <div id="network-badge-wrap"></div>
+            </header>
+
+            <!-- Stats Row -->
+            <div class="bc-stat-grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom:28px;">
+                <div class="chain-stat">
+                    <div class="label">Total Records</div>
+                    <div class="value" id="bc-total">—</div>
+                    <div class="sub">On-chain entries</div>
+                </div>
+                <div class="chain-stat">
+                    <div class="label">Last Block</div>
+                    <div class="value" id="bc-last-block" style="font-size:16px;">—</div>
+                    <div class="sub" id="bc-last-ts">Fetching...</div>
+                </div>
+                <div class="chain-stat">
+                    <div class="label">Network</div>
+                    <div class="value" id="bc-network" style="font-size:16px; color:var(--safe-green);">—</div>
+                    <div class="sub" id="bc-wallet">—</div>
+                </div>
+                <div class="chain-stat">
+                    <div class="label">FIRs Anchored</div>
+                    <div class="value" id="bc-firs">—</div>
+                    <div class="sub">Unique FIR IDs</div>
+                </div>
+            </div>
+
+            <!-- Timeline of latest records -->
+            <div class="card" style="margin-bottom:24px;">
+                <h3 style="font-size:14px; font-weight:600; margin-bottom:4px;">
+                    <i class="fas fa-stream accent-blue" style="margin-right:8px;"></i>Latest Anchor Events
+                </h3>
+                <p class="muted" style="font-size:12px; margin-bottom:16px;">Most recent FIR hashes written to chain.</p>
+                <div class="timeline-scroll" id="timeline-strip">
+                    <div style="color:var(--text-muted); font-size:12px; padding:20px;">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Full Ledger Table -->
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3 style="font-size:15px; font-weight:600;">Immutable Ledger</h3>
+                    <button class="btn btn-outline btn-sm" onclick="loadBlockchain()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>FIR ID</th>
+                                <th>Anchored At</th>
+                                <th>Content Hash (SHA-256)</th>
+                                <th>Tx Hash</th>
+                                <th>Block</th>
+                                <th>Txn Fee</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bc-tbody" class="mono">
+                            <tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">
+                                <i class="fas fa-spinner fa-spin"></i> Loading ledger...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html" class="active"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+        async function loadBlockchain() {
+            try {
+                const status = await getChainStatus();
+                const badgeWrap = document.getElementById('network-badge-wrap');
+                badgeWrap.innerHTML = `
+                    <div class="network-badge ${status.connected ? '' : 'mock'}">
+                        <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span>
+                        ${status.connected ? 'LIVE: ' : 'MOCK: '}${status.network}
+                    </div>`;
+
+                document.getElementById('bc-network').textContent = status.network;
+                document.getElementById('bc-wallet').textContent = status.wallet ? (status.wallet.slice(0,6) + '...' + status.wallet.slice(-4)) : 'OFFLINE';
+
+                const ledger = await getBlockchainLedger();
+                document.getElementById('bc-total').textContent = ledger.length;
+                document.getElementById('bc-firs').textContent = new Set(ledger.map(l => l.fir_id)).size;
+                
+                if (ledger.length > 0) {
+                    const last = ledger[0];
+                    document.getElementById('bc-last-block').textContent = '#' + (last.block_num || last.block || 0);
+                    document.getElementById('bc-last-ts').textContent = last.anchored_at ? new Date(last.anchored_at).toLocaleTimeString() : last.time || '—';
+
+                    const strip = document.getElementById('timeline-strip');
+                    strip.innerHTML = ledger.slice(0, 8).map(l => {
+                        const fh = l.fir_hash || l.data_hash || '';
+                        const ts = l.anchored_at ? new Date(l.anchored_at).toLocaleTimeString() : (l.time || '—');
+                        return `<div class="timeline-card">
+                            <div class="muted" style="font-size:10px; margin-bottom:4px;">${ts}</div>
+                            <div style="font-size:12px; font-weight:700;">${l.fir_id || '—'}</div>
+                            <div class="mono blue" style="font-size:10px; margin-top:8px;">${fh ? fh.slice(0,10)+'...' : '—'}</div>
+                        </div>`;
+                    }).join('');
+                }
+
+                const tbody = document.getElementById('bc-tbody');
+                tbody.innerHTML = ledger.map(l => {
+                    const firHash  = l.fir_hash || l.data_hash || '';
+                    const txHash   = l.tx_hash  || '';
+                    const anchored = l.anchored_at ? new Date(l.anchored_at).toLocaleString() : (l.time || '—');
+                    const blockNum = l.block_num || l.block || 0;
+                    const isLive   = l.status && l.status.toUpperCase() === 'CONFIRMED';
+                    return `<tr>
+                        <td style="color:var(--cyber-blue); font-weight:700;">${l.fir_id || '—'}</td>
+                        <td style="font-size:11px;">${anchored}</td>
+                        <td class="mono" style="font-size:10px;">${firHash ? firHash.slice(0,24)+'...' : '—'}</td>
+                        <td class="mono" style="font-size:10px; color:var(--t3)">${txHash ? txHash.slice(0,16)+'...' : '—'}</td>
+                        <td class="blue">#${blockNum}</td>
+                        <td style="color:var(--safe-green); font-size:12px; font-weight:600;">${l.txn_fee || '—'}</td>
+                        <td><span class="badge ${isLive ? 'badge-success' : 'badge-warning'}">${isLive ? '✓ Confirmed' : '⟳ Mock'}</span></td>
+                    </tr>`;
+                }).join('') || '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);">No blockchain records yet. Register a FIR to create one.</td></tr>';
+
+            } catch(e) { console.error('BC load error:', e); }
+        }
+
+        loadBlockchain();
+        setInterval(loadBlockchain, 10000);
+    </script>
+    
+    <!-- Duplicate mobile-nav removed -->
+</body>
+</html>

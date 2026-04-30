@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | Dashboard</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/emailjs-alert.js"></script>
+</head>
+<body>
+    <div id="p5-container" style="position: fixed; inset: 0; z-index: -1;"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item active"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+            <nav class="nav-group" style="margin-top:auto; padding-top:20px; border-top:1px solid rgba(255,255,255,0.05);">
+                <a href="#" onclick="sessionStorage.clear(); window.location.href='index.html';" class="nav-item" style="color:var(--critical-red);">
+                    <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header" style="margin-bottom: 32px;">
+                <h1 style="font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">Dashboard</h1>
+                <p class="muted" style="font-size: 14px;">Welcome back, Administrator. System status: <span class="accent-green">Nominal</span></p>
+            </header>
+
+            <div class="bento-grid">
+                <!-- Top Row KPI Cards -->
+                <div class="card col-3">
+                    <div class="muted" style="font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Total Transactions</div>
+                    <div class="mono" id="stat-total-txns" style="font-size: 32px; font-weight: 700;">...</div>
+                    <div class="accent-green" id="stat-txn-trend" style="font-size: 12px; margin-top: 4px;"><i class="fas fa-arrow-up"></i> 12.4%</div>
+                    <i class="fas fa-exchange-alt card-icon-bg"></i>
+                </div>
+                <div class="card col-3">
+                    <div class="muted" style="font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Alerts (Total)</div>
+                    <div class="mono accent-red" id="stat-alerts" style="font-size: 32px; font-weight: 700;">...</div>
+                    <div class="muted" id="stat-alerts-detail" style="font-size: 12px; margin-top: 4px;">Loading...</div>
+                    <i class="fas fa-exclamation-triangle card-icon-bg"></i>
+                </div>
+                <div class="card col-3">
+                    <div class="muted" style="font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">System Uptime</div>
+                    <div class="mono" style="font-size: 32px; font-weight: 700;">99.99%</div>
+                    <div class="muted" style="font-size: 12px; margin-top: 4px;">Node Cluster: Active</div>
+                    <i class="fas fa-server card-icon-bg"></i>
+                </div>
+                <div class="card col-3">
+                    <div class="muted" style="font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px;">Avg Fraud Score</div>
+                    <div class="mono accent-blue" id="stat-avg-score" style="font-size: 32px; font-weight: 700;">...</div>
+                    <div class="muted" id="stat-blockchain" style="font-size: 12px; margin-top: 4px;">Blockchain: Connected</div>
+                    <i class="fas fa-project-diagram card-icon-bg"></i>
+                </div>
+
+                <!-- Middle Left: Large Chart -->
+                <div class="card col-8" style="grid-row: span 2;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h3 style="font-size: 16px; font-weight: 600;">Transaction Volume vs Fraud Attempts</h3>
+                        <div class="muted" style="font-size: 12px;">Last 30 Days</div>
+                    </div>
+                    <div style="height: 300px; width: 100%;">
+                        <canvas id="dashboardChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Middle Right: Quick Navigation -->
+                <div class="card col-4">
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Quick Actions</h3>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <button class="btn btn-outline" onclick="location.href='fraud.html'" style="justify-content: flex-start; width: 100%;">
+                            <i class="fas fa-search"></i> Verify Transaction
+                        </button>
+                        <button class="btn btn-outline" onclick="location.href='docguard.html'" style="justify-content: flex-start; width: 100%;">
+                            <i class="fas fa-user-plus"></i> New KYC Audit
+                        </button>
+                        <button class="btn btn-outline" onclick="location.href='fir.html'" style="justify-content: flex-start; width: 100%;">
+                            <i class="fas fa-file-export"></i> Generate Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- System Status -->
+                <div class="card col-4">
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">System Status</h3>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="muted" style="font-size: 13px;">AI Core</span>
+                            <span class="badge badge-success">Operational</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="muted" style="font-size: 13px;">Chain Ledger</span>
+                            <span class="badge badge-success">Synced</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="muted" style="font-size: 13px;">Sentinel Nodes</span>
+                            <span class="badge badge-info">854/854</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Emergency Alert Card -->
+                <div class="card col-4" id="emergency-alert-card" style="border:1px solid rgba(255,51,102,0.25); background:rgba(255,51,102,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                        <h3 style="font-size:14px;font-weight:700;color:#FF3366;">🚨 Emergency Alert</h3>
+                        <span class="badge badge-danger" id="emg-risk-badge" style="font-size:9px;">STANDBY</span>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Current Risk Score</div>
+                    <div id="emg-score-display" style="font-family:monospace;font-size:28px;font-weight:800;color:#FF3366;margin-bottom:4px;">--</div>
+                    <div id="emg-message" class="muted" style="font-size:11px;margin-bottom:16px;">Monitoring for threats...</div>
+                    <button id="send-alert-btn" onclick="handleManualAlert()"
+                        style="width:100%;padding:10px;border-radius:8px;border:1px solid #FF3366;
+                               background:rgba(255,51,102,0.12);color:#FF3366;font-family:monospace;
+                               font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;
+                               transition:all .2s;">
+                        🚨 SEND EMERGENCY ALERT
+                    </button>
+                    <div style="font-size:9px;color:rgba(255,255,255,0.2);margin-top:10px;text-align:center;">
+                        Sends to 4 stakeholders via email
+                    </div>
+                </div>
+
+                <!-- Bottom Row: Recent Activity -->
+                <div class="card col-12">
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Recent Activity Ticker</h3>
+                    <div id="ticker" style="display: flex; overflow-x: auto; gap: 24px; padding-bottom: 8px; white-space: nowrap;">
+                        <div class="skeleton" style="width: 200px; height: 16px;"></div>
+                        <div class="skeleton" style="width: 250px; height: 16px;"></div>
+                        <div class="skeleton" style="width: 180px; height: 16px;"></div>
+                        <div class="skeleton" style="width: 220px; height: 16px;"></div>
+                        <div class="skeleton" style="width: 200px; height: 16px;"></div>
+                    </div>
+                </div>
+            </div>
+    </div>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html" class="active"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+        // ForceFieldBackground Implementation (adapted from React Component)
+        const forceFieldSketch = (p) => {
+            const imageUrl = "https://cdn.pixabay.com/photo/2024/12/13/20/29/alps-9266131_1280.jpg";
+            let originalImg;
+            let img;
+            let palette = [];
+            let points = [];
+            
+            const params = {
+                hue: 210,
+                saturation: 80,
+                threshold: 255,
+                minStroke: 1,
+                maxStroke: 3,
+                spacing: 14,
+                density: 2.0,
+                invertImage: true,
+                invertWireframe: true,
+                magnifierEnabled: true,
+                magnifierRadius: 180,
+                forceStrength: 20,
+                friction: 0.85,
+                restoreSpeed: 0.08
+            };
+
+            let magnifierX = 0;
+            let magnifierY = 0;
+            let magnifierInertia = 0.25;
+
+            p.preload = () => {
+                originalImg = p.loadImage(imageUrl);
+            };
+
+            p.setup = () => {
+                const container = document.getElementById('p5-container');
+                p.createCanvas(container.clientWidth, container.clientHeight);
+                magnifierX = p.width / 2;
+                magnifierY = p.height / 2;
+                processImage();
+                generatePalette(params.hue, params.saturation);
+                generatePoints();
+            };
+
+            p.windowResized = () => {
+                const container = document.getElementById('p5-container');
+                p.resizeCanvas(container.clientWidth, container.clientHeight);
+                processImage();
+                generatePoints();
+            };
+
+            function processImage() {
+                if (!originalImg) return;
+                img = originalImg.get();
+                img.resize(p.width, p.height);
+                img.filter(p.GRAY);
+                if (params.invertImage) {
+                    img.loadPixels();
+                    for (let i = 0; i < img.pixels.length; i += 4) {
+                        img.pixels[i] = 255 - img.pixels[i];
+                        img.pixels[i + 1] = 255 - img.pixels[i + 1];
+                        img.pixels[i + 2] = 255 - img.pixels[i + 2];
+                    }
+                    img.updatePixels();
+                }
+            }
+
+            function generatePalette(h, s) {
+                palette = [];
+                p.push();
+                p.colorMode(p.HSL);
+                for (let i = 0; i < 12; i++) {
+                    let lightness = p.map(i, 0, 11, 95, 5);
+                    palette.push(p.color(h, s, lightness));
+                }
+                p.pop();
+            }
+
+            function generatePoints() {
+                if (!img) return;
+                points = [];
+                const spacing = Math.max(2, params.spacing);
+                for (let y = 0; y < img.height; y += spacing) {
+                    for (let x = 0; x < img.width; x += spacing) {
+                        if (p.random() > params.density) continue;
+                        points.push({
+                            pos: p.createVector(x, y),
+                            originalPos: p.createVector(x, y),
+                            vel: p.createVector(0, 0)
+                        });
+                    }
+                }
+            }
+
+            p.draw = () => {
+                if (!img) return;
+                p.background(10); // Obsidian dark
+
+                magnifierX = p.lerp(magnifierX, p.mouseX, magnifierInertia);
+                magnifierY = p.lerp(magnifierY, p.mouseY, magnifierInertia);
+
+                for (let pt of points) {
+                    let dir = p5.Vector.sub(pt.pos, p.createVector(magnifierX, magnifierY));
+                    let d = dir.mag();
+                    if (d < params.magnifierRadius) {
+                        dir.normalize();
+                        let force = dir.mult(params.forceStrength / Math.max(1, d));
+                        pt.vel.add(force);
+                    }
+                    pt.vel.mult(params.friction);
+                    let restore = p5.Vector.sub(pt.pos, pt.originalPos).mult(-params.restoreSpeed);
+                    pt.vel.add(restore);
+                    pt.pos.add(pt.vel);
+                }
+
+                img.loadPixels();
+                p.noFill();
+                for (let pt of points) {
+                    let x = pt.pos.x;
+                    let y = pt.pos.y;
+                    let px = p.constrain(p.floor(x), 0, img.width - 1);
+                    let py = p.constrain(p.floor(y), 0, img.height - 1);
+                    let index = (px + py * img.width) * 4;
+                    let brightness = img.pixels[index];
+                    if (brightness === undefined) continue;
+
+                    if (params.invertWireframe ? brightness < params.threshold : brightness > params.threshold) {
+                        let shadeIndex = p.constrain(p.floor(p.map(brightness, 0, 255, 0, palette.length - 1)), 0, palette.length - 1);
+                        let strokeSize = p.map(brightness, 0, 255, params.minStroke, params.maxStroke);
+                        let d = p.dist(x, y, magnifierX, magnifierY);
+                        if (d < params.magnifierRadius) {
+                            strokeSize *= p.map(d, 0, params.magnifierRadius, 1.3, 1);
+                        }
+                        p.stroke(palette[shadeIndex]);
+                        p.strokeWeight(strokeSize);
+                        p.point(x, y);
+                    }
+                }
+            };
+        };
+
+        new p5(forceFieldSketch, 'p5-container');
+
+        // ── KAVACH Dynamic Integration ──────────────────────────
+        async function buildChart() {
+            const canvas = document.getElementById('dashboardChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(0, 210, 255, 0.2)');
+            gradient.addColorStop(1, 'rgba(0, 210, 255, 0)');
+
+            // Fetch real transactions for chart data
+            let txns = [];
+            try { txns = await getTransactions({ limit: 50 }); } catch(e) {}
+
+            // Group by date
+            const byDate = {};
+            const fraudByDate = {};
+            txns.forEach(t => {
+                const d = (t.timestamp || t.created_at || '').substring(0, 10);
+                if (!d) return;
+                byDate[d]      = (byDate[d] || 0) + (t.amount || 0);
+                if (t.status === 'flagged') fraudByDate[d] = (fraudByDate[d] || 0) + 1;
+            });
+            const labels = Object.keys(byDate).sort().slice(-7);
+            const volumes = labels.map(d => Math.round(byDate[d] || 0));
+            const fraudCts = labels.map(d => fraudByDate[d] || 0);
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.length ? labels : ['No data'],
+                    datasets: [{
+                        label: 'Transaction Volume (₹)',
+                        data: volumes,
+                        borderColor: '#00D2FF',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Flagged Transactions',
+                        data: fraudCts,
+                        borderColor: '#FF3366',
+                        backgroundColor: 'transparent',
+                        borderDash: [5, 5],
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#888', font: { family: 'Inter' } } }
+                    },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' } },
+                        x: { grid: { display: false }, ticks: { color: '#888' } }
+                    }
+                }
+            });
+        }
+
+        buildChart();
+
+        // ── Emergency Alert: Manual handler ────────────────
+        function handleManualAlert() {
+            const btn  = document.getElementById('send-alert-btn');
+            const score = parseInt(document.getElementById('emg-score-display').textContent) || 0;
+            const risk  = document.getElementById('emg-risk-badge').textContent || 'UNKNOWN';
+            const msg   = document.getElementById('emg-message').textContent || 'Manual alert from dashboard.';
+
+            btn.disabled = true;
+            btn.textContent = '⏳ SENDING...';
+            btn.style.opacity = '0.6';
+
+            sendAlertToAll(score, risk, msg);
+
+            setTimeout(() => {
+                btn.textContent = '✅ SENT';
+                btn.style.borderColor = '#00E676';
+                btn.style.color = '#00E676';
+                btn.style.background = 'rgba(0,230,118,0.08)';
+            }, 800);
+        }
+
+        // ── KAVACH Dynamic Integration ──────────────────────────
+        async function loadDashboard() {
+            // 1. Update Stats
+            try {
+                const stats = await getDashboardSummary();
+                document.getElementById('stat-total-txns').textContent = (stats.total_transactions || 0).toLocaleString();
+                document.getElementById('stat-alerts').textContent = (stats.active_alerts || 0) + (stats.total_firs || 0);
+                document.getElementById('stat-alerts-detail').textContent = `${stats.critical || 0} Critical | ${stats.total_firs || 0} FIRs Filed`;
+                document.getElementById('stat-avg-score').textContent = (stats.avg_fraud_score || 0) + '%';
+
+                // Update emergency alert card
+                const avgScore = parseFloat(stats.avg_fraud_score) || 0;
+                document.getElementById('emg-score-display').textContent = Math.round(avgScore);
+                const riskLevel = avgScore >= 80 ? 'CRITICAL' : avgScore >= 60 ? 'HIGH' : avgScore >= 30 ? 'MEDIUM' : 'LOW';
+                const badge = document.getElementById('emg-risk-badge');
+                badge.textContent = riskLevel;
+                badge.style.background = avgScore >= 80 ? '#FF3366' : avgScore >= 60 ? '#FF6B35' : avgScore >= 30 ? '#FFB020' : '#00E676';
+                document.getElementById('emg-message').textContent =
+                    avgScore >= 80 ? '⚠ CRITICAL threshold breached!' :
+                    avgScore >= 60 ? 'Elevated risk detected.' :
+                    'System nominal. Monitoring active.';
+
+                // Auto-trigger email if score >= 80
+                autoTriggerAlert(
+                    Math.round(avgScore),
+                    riskLevel,
+                    `System-wide avg fraud score: ${avgScore}% — ${stats.active_alerts} active alerts.`,
+                    'dashboard_' + new Date().toISOString().slice(0,13) // once per hour
+                );
+
+                const chainEl = document.getElementById('stat-blockchain');
+                if (chainEl) {
+                    // Also fetch live chain status to be accurate
+                    try {
+                        const chain = await getChainStatus();
+                        const connected = chain.connected === true;
+                        chainEl.textContent = `Blockchain: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`;
+                        chainEl.className = connected ? 'accent-green' : 'muted';
+                    } catch(_) {
+                        const cs = stats.chain_status || 'UNKNOWN';
+                        chainEl.textContent = `Blockchain: ${cs}`;
+                        chainEl.className = cs === 'CONNECTED' ? 'accent-green' : 'muted';
+                    }
+                }
+            } catch (err) {
+                console.error("Dashboard stats failed:", err);
+            }
+
+            // 2. Update Ticker (Independently)
+            try {
+                const txns = await getTransactions({limit: 10});
+                const ticker = document.getElementById('ticker');
+                if (txns && txns.length > 0) {
+                    ticker.innerHTML = txns.map(t => `
+                        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; background: rgba(255,255,255,0.03); padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
+                            <span class="${t.status === 'flagged' ? 'accent-red' : 'accent-blue'}" style="font-size: 18px;">•</span>
+                            <span style="font-size: 13px; font-family: var(--font-mono); color: var(--text-pure);">
+                                <span style="color: var(--text-muted)">${new Date(t.timestamp || t.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span> | 
+                                ${t.status === 'flagged' ? '<span class="accent-red">FLAGGED</span> ' : ''}${t.channel.toUpperCase()} txn ₹${t.amount} by ${t.account_id}
+                            </span>
+                        </div>
+                    `).join('');
+                } else {
+                    ticker.innerHTML = '<div class="muted" style="font-size: 13px; padding: 10px;">SYSTEM READY | Monitoring live traffic for suspicious activity...</div>';
+                }
+            } catch (err) {
+                console.error("Ticker fetch failed:", err);
+                const ticker = document.getElementById('ticker');
+                if (ticker && ticker.querySelector('.skeleton')) {
+                    ticker.innerHTML = '<div class="muted" style="font-size: 13px; padding: 10px;">Connection issue. Retrying...</div>';
+                }
+            }
+        }
+
+        loadDashboard();
+        setInterval(loadDashboard, 5000); // refresh every 5s
+    </script>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | NetWatch</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <style>
+        #leaflet-map {
+            width: 100%; height: 420px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            z-index: 1;
+        }
+        .leaflet-container { background: #0d0d1a !important; }
+        .threat-none     { color: var(--safe-green); }
+        .threat-medium   { color: #FFB020; }
+        .threat-high     { color: #FF6B35; }
+        .threat-critical { color: var(--critical-red); }
+        .ip-row { cursor: pointer; transition: background 0.15s; }
+        .ip-row:hover { background: rgba(0,210,255,0.04) !important; }
+        .stat-pill {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            padding: 16px 20px;
+        }
+        .stat-pill .v { font-size: 24px; font-weight: 800; font-family: var(--font-mono); }
+        .stat-pill .l { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 4px; }
+        .popup-dark .leaflet-popup-content-wrapper {
+            background: rgba(15,15,25,0.95);
+            border: 1px solid rgba(0,210,255,0.3);
+            color: #fff;
+            border-radius: 8px;
+        }
+        .popup-dark .leaflet-popup-tip { background: rgba(15,15,25,0.95); }
+
+        @keyframes mapPing { 0%{transform:scale(1);opacity:1} 100%{transform:scale(3);opacity:0} }
+        @keyframes slideDown { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes flashRow { 0%{background:rgba(0,210,255,0.2)} 100%{background:transparent} }
+        .new-ip-flash { animation: flashRow 2s ease-out; }
+        .nw-live-bar {
+            display:flex; align-items:center; gap:10px;
+            font-family:var(--font-mono); font-size:11px; color:var(--text-muted);
+        }
+        .nw-live-dot { width:7px;height:7px;border-radius:50%;background:#00E676;
+            box-shadow:0 0 8px #00E676; display:inline-block;
+            animation:pulse-live 1.5s infinite; }
+        @keyframes pulse-live { 0%,100%{opacity:1} 50%{opacity:.3} }
+        .ip-capture-ticker {
+            display:flex; align-items:center; gap:8px; padding:8px 14px;
+            background:rgba(0,210,255,0.06); border:1px solid rgba(0,210,255,0.15);
+            border-radius:8px; font-size:11px; font-family:var(--font-mono);
+            animation:slideDown .3s ease;
+        }
+        @media (max-width: 768px) {
+            .stat-grid-nw { grid-template-columns: repeat(2, 1fr) !important; }
+            .nw-lookup-flex { flex-direction: column; align-items: stretch !important; }
+            #leaflet-map { height: 300px; }
+            header { flex-direction: column; align-items: flex-start !important; gap: 12px; }
+        }
+        @media (max-width: 480px) {
+            .stat-grid-nw { grid-template-columns: 1fr !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item active"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:28px;">
+                <div>
+                    <h1 style="font-size:24px; font-weight:700;">NetWatch — <span style="color:var(--cyber-blue)">IP Intelligence</span></h1>
+                    <p class="muted" style="margin-top:4px;">Live geolocation and threat scoring for all access events.</p>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <span class="nw-live-bar"><span class="nw-live-dot"></span> LIVE &nbsp;|&nbsp; <span id="nw-clock">--:--:--</span></span>
+                        <span id="status-badge" class="badge badge-success">SECURE</span>
+                        <button class="btn btn-outline btn-sm" onclick="loadNetWatch()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                    <div id="ip-ticker" style="display:none;"></div>
+                </div>
+            </header>
+
+            <!-- Stats Row -->
+            <div class="stat-grid-nw" style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px;">
+                <div class="stat-pill">
+                    <div class="l">Total Logins</div>
+                    <div class="v blue" id="nw-total">0</div>
+                </div>
+                <div class="stat-pill">
+                    <div class="l">Failed Attempts</div>
+                    <div class="v red" id="nw-flagged">0</div>
+                </div>
+                <div class="stat-pill">
+                    <div class="l">Suspicious IPs</div>
+                    <div class="v yellow" id="nw-suspicious">0</div>
+                </div>
+                <div class="stat-pill">
+                    <div class="l">Countries</div>
+                    <div class="v" id="nw-countries">0</div>
+                </div>
+            </div>
+
+            <!-- IP Check Tool -->
+            <div class="card" style="margin-bottom:24px;">
+                <h3 style="font-size:14px; font-weight:600; margin-bottom:16px;"><i class="fas fa-search accent-blue" style="margin-right:8px;"></i>Manual IP Intelligence Lookup</h3>
+                <div class="nw-lookup-flex" style="display:flex; gap:12px; align-items:center;">
+                    <input type="text" id="ip-input" placeholder="Enter IP address (e.g. 1.2.3.4)"
+                        style="flex:1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 14px; color:#fff; font-family:var(--font-mono); font-size:13px; outline:none;">
+                    <button class="btn btn-primary" onclick="checkIP()" id="ip-check-btn">
+                        <i class="fas fa-crosshairs"></i> Analyze IP
+                    </button>
+                </div>
+                <div id="ip-result" style="margin-top:16px; display:none;"></div>
+            </div>
+
+            <!-- Live Map -->
+            <div class="card" style="margin-bottom:24px; padding:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3 style="font-size:14px; font-weight:600;"><i class="fas fa-globe-asia accent-blue" style="margin-right:8px;"></i>Live Threat Map
+                        <span style="font-size:10px;background:rgba(255,51,102,0.15);color:#FF3366;border:1px solid rgba(255,51,102,0.3);padding:2px 8px;border-radius:20px;margin-left:10px;font-weight:400;">REAL-TIME</span>
+                    </h3>
+                    <span class="muted" style="font-size:11px;" id="map-count">Loading pins...</span>
+                </div>
+                <div id="leaflet-map"></div>
+            </div>
+
+            <!-- IP Access Log -->
+            <div class="card">
+                <h3 style="font-size:15px; font-weight:600; margin-bottom:20px;">IP Access Log</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>IP Address</th>
+                                <th>City</th>
+                                <th>Country</th>
+                                <th>ISP</th>
+                                <th>VPN/Proxy/TOR</th>
+                                <th>Threat Level</th>
+                                <th>Flagged</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ip-tbody">
+                            <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
+                                <i class="fas fa-spinner fa-spin"></i> Loading...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html" class="active"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+        let map = null;
+        let markers = [];
+        let prevIPSet = new Set();
+
+        // Live clock
+        setInterval(() => {
+            const el = document.getElementById('nw-clock');
+            if (el) el.textContent = new Date().toLocaleTimeString();
+        }, 1000);
+
+        function showIPTicker(ip, city) {
+            const ticker = document.getElementById('ip-ticker');
+            if (!ticker) return;
+            ticker.style.display = 'flex';
+            ticker.innerHTML = `<div class="ip-capture-ticker"><span class="nw-live-dot"></span> NEW IP CAPTURED &nbsp;·&nbsp; <strong>${ip}</strong> &nbsp;·&nbsp; ${city || 'Unknown'}</div>`;
+            setTimeout(() => { ticker.style.display = 'none'; }, 5000);
+        }
+
+        function initMap() {
+            map = L.map('leaflet-map', { zoomControl: true, attributionControl: false }).setView([20, 78], 3);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map);
+        }
+
+        function threatColor(sev) {
+            const map = { critical: '#FF3366', warning: '#FFB020', low: '#00E676' };
+            return map[sev] || '#888';
+        }
+
+        async function loadNetWatch() {
+            try {
+                await captureAccess();
+
+                const stats = await getNetWatchStats();
+                document.getElementById('nw-total').textContent = stats.total_logins;
+                document.getElementById('nw-flagged').textContent = stats.failed_attempts;
+                document.getElementById('nw-suspicious').textContent = stats.suspicious_ips;
+                document.getElementById('nw-countries').textContent = stats.countries;
+
+                const logs = await getNetWatchAccessLog();
+
+                // Detect new IPs since last poll
+                const currentIPs = new Set(logs.map(l => l.ip));
+                logs.forEach(l => {
+                    if (!prevIPSet.has(l.ip)) showIPTicker(l.ip, l.city || l.location);
+                });
+                prevIPSet = currentIPs;
+
+                renderTable(logs);
+                renderMap(logs);
+            } catch(e) { console.error(e); }
+        }
+
+        function renderTable(logs) {
+            const tbody = document.getElementById('ip-tbody');
+            tbody.innerHTML = logs.map(l => `
+                <tr class="ip-row" id="row-${l.ip.replace(/\./g,'-')}" onclick="focusIP('${l.ip}', ${l.lat}, ${l.lon})">
+                    <td class="mono" style="font-size:12px;">${l.ip}</td>
+                    <td style="font-size:12px;">${l.location}</td>
+                    <td class="muted" style="font-size:11px;">${l.country}</td>
+                    <td>${l.isp}</td>
+                    <td>${(l.anomalies||[]).map(a => `<span class="badge" style="font-size:8px;background:rgba(255,176,32,0.1);color:#FFB020;border:none;margin-right:4px">${a}</span>`).join('')}</td>
+                    <td style="font-size:10px;font-weight:700;color:${threatColor(l.severity)}">${(l.severity||'LOW').toUpperCase()}</td>
+                    <td><span class="badge ${l.status==='BLOCKED'?'badge-danger':l.status==='REVIEW'?'badge-warning':'badge-success'}" style="font-size:8px;">${l.status}</span></td>
+                    <td class="muted" style="font-size:11px;">${l.time}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderMap(logs) {
+            markers.forEach(m => map.removeLayer(m.layer));
+            markers = [];
+            logs.forEach(l => {
+                if (!l.lat || !l.lon) return;
+                const m = L.circleMarker([l.lat, l.lon], {
+                    radius: 8, weight: 2, opacity: 1, fillOpacity: 0.8,
+                    fillColor: threatColor(l.severity), color: '#fff'
+                }).addTo(map);
+                
+                m.bindPopup(`
+                    <div style="min-width:180px; padding:5px;">
+                        <div class="muted" style="font-size:10px; margin-bottom:4px;">IP ADDRESS</div>
+                        <div style="font-family:monospace; font-weight:700; color:var(--accent-blue);">${l.ip}</div>
+                        <hr style="margin:8px 0; border:0; border-top:1px solid rgba(255,255,255,0.1);">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                            <div><div class="muted" style="font-size:9px;">CITY</div><div style="font-size:11px;">${l.city}</div></div>
+                            <div><div class="muted" style="font-size:9px;">TIME</div><div style="font-size:11px;">${l.time.split(' ')[1]}</div></div>
+                        </div>
+                    </div>
+                `, {className:'popup-dark'});
+                
+                markers.push({ ip: l.ip, layer: m });
+            });
+            document.getElementById('map-count').textContent = `${logs.length} login points tracked`;
+        }
+
+        function focusIP(ip, lat, lon) {
+            if (map && lat && lon) {
+                map.setView([lat, lon], 8, { animate: true });
+                // Highlight marker
+                const m = markers.find(mark => mark.ip === ip);
+                if (m) m.layer.openPopup();
+                
+                // Highlight row
+                document.querySelectorAll('.ip-row').forEach(r => r.style.background = '');
+                const row = document.getElementById(`row-${ip.replace(/\./g,'-')}`);
+                if (row) row.style.background = 'rgba(0,210,255,0.1)';
+            }
+        }
+
+        async function checkIP() {
+            const ip = document.getElementById('ip-input').value;
+            if (!ip) return;
+            const btn = document.getElementById('ip-check-btn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                const res = await checkIPIntelligence(ip);
+                const geo = res.geo || {};
+                const resEl = document.getElementById('ip-result');
+                resEl.style.display = 'block';
+                resEl.innerHTML = `
+                    <div style="padding:15px; background:rgba(255,255,255,0.02); border:1px solid var(--t2); border-radius:8px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div><div class="muted text-xs">CITY</div><div class="text-sm">${geo.city}</div></div>
+                        <div><div class="muted text-xs">COUNTRY</div><div class="text-sm">${geo.country}</div></div>
+                        <div><div class="muted text-xs">THREAT</div><div class="text-sm" style="color:#FFB020">${geo.threat_level || 'LOW'}</div></div>
+                        <div><div class="muted text-xs">ISP</div><div class="text-sm">${geo.isp}</div></div>
+                    </div>`;
+                if (geo.lat) focusIP(ip, geo.lat, geo.lon);
+            } finally {
+                btn.innerHTML = '<i class="fas fa-crosshairs"></i> Analyze IP';
+            }
+        }
+
+        initMap();
+        loadNetWatch();
+        setInterval(loadNetWatch, 10000);
+    </script>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html" class="active"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+</body>
+</html>

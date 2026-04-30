@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | Fraud Monitor</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/emailjs-alert.js"></script>
+    <style>
+        @keyframes pulse-red { 0%,100%{opacity:.8;transform:scale(1)} 50%{opacity:1;transform:scale(1.03)} }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        @keyframes fadeSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .pulse-banner { animation: pulse-red 3s ease-in-out infinite; }
+        .fraud-header {
+            display:flex; justify-content:space-between; align-items:flex-end;
+            margin-bottom:28px; padding-bottom:20px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .fraud-header h1 { font-size:26px; font-weight:800; letter-spacing:-0.5px; }
+        .fraud-header h1 span { 
+            background: linear-gradient(90deg,#00D2FF,#FF3366,#FFB020);
+            background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+            animation: shimmer 4s linear infinite;
+        }
+        .live-clock { font-family:var(--font-mono); font-size:12px; color:var(--text-muted); }
+        .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#00E676;
+            box-shadow:0 0 8px #00E676; margin-right:6px; animation:pulse-red 1.5s infinite; }
+        .circular-progress {
+            position:relative; width:160px; height:160px; border-radius:50%;
+            background:conic-gradient(var(--cyber-blue) 0%,rgba(255,255,255,0.05) 0);
+            display:flex; align-items:center; justify-content:center; margin:20px auto;
+            transition:background 0.8s ease; box-shadow:0 0 30px rgba(0,210,255,0.1);
+        }
+        .circular-progress::before {
+            content:""; position:absolute; width:136px; height:136px;
+            border-radius:50%; background:#0d0d1a; z-index:1;
+        }
+        .progress-value { position:relative; z-index:10; font-family:var(--font-mono); font-size:36px; font-weight:800; }
+        #background-paths { position:fixed; inset:0; z-index:-1; background:var(--bg-obsidian); pointer-events:none; }
+        .paths-svg { width:100%; height:100%; opacity:0.15; }
+        .txn-submit-form { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.05); margin-top:16px; }
+        .txn-form-input { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:8px 12px; color:#fff; font-size:12px; outline:none; transition:border-color .2s; }
+        .txn-form-input:focus { border-color:var(--cyber-blue); box-shadow:0 0 0 2px rgba(0,210,255,0.1); }
+        .alert-item { animation:fadeSlideIn .3s ease; }
+        .stat-mini { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:14px; }
+        .stat-mini .icon { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+        @media(max-width:768px){ .txn-submit-form{grid-template-columns:1fr} .circular-progress{width:120px;height:120px} .circular-progress::before{width:100px;height:100px} .progress-value{font-size:24px} }
+    </style>
+</head>
+<body>
+    <div id="background-paths">
+        <svg class="paths-svg" id="paths-svg" viewBox="0 0 696 316" fill="none"></svg>
+    </div>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item active"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+            <nav class="nav-group" style="margin-top:auto; padding-top:20px; border-top:1px solid rgba(255,255,255,0.05);">
+                <a href="#" onclick="sessionStorage.clear(); window.location.href='index.html';" class="nav-item" style="color:var(--critical-red);">
+                    <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="fraud-header">
+                <div>
+                    <h1>Fraud <span>Monitor</span></h1>
+                    <p class="muted" style="margin-top:5px;font-size:13px;">Real-time transaction risk analysis &amp; fusion scoring</p>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span class="badge badge-success" style="font-size:10px;"><span class="live-dot"></span>LIVE</span>
+                        <span class="live-clock" id="fraud-clock">--:--:--</span>
+                    </div>
+                    <span class="muted" style="font-size:10px;">Auto-refresh every 3s</span>
+                </div>
+            </div>
+
+            <!-- Dynamic Alert Banner — only shows when there are CRITICAL alerts -->
+            <div id="alert-banner" style="display:none; margin-bottom:24px;" class="card pulse-banner">
+                <div style="display:flex; align-items:center; gap:20px; padding:4px; background:rgba(255,51,102,0.12); border:1px solid var(--critical-red); border-radius:12px;">
+                    <i class="fas fa-radiation fa-spin accent-red" style="font-size:28px;"></i>
+                    <div>
+                        <h2 style="font-size:18px; font-weight:800; color:var(--text-pure);" id="banner-title">CRITICAL ALERT</h2>
+                        <p class="muted" id="banner-detail" style="font-size:14px; margin-top:4px;"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bento-grid">
+                <!-- Fraud Score Card -->
+                <div class="card col-4" style="display:flex; flex-direction:column; align-items:center;">
+                    <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h3 style="font-size:14px; font-weight:600;">Fraud Fusion Score</h3>
+                        <i class="fas fa-fingerprint muted"></i>
+                    </div>
+                    <div class="card" style="width:100%;">
+                        <div class="muted" style="font-size:12px; font-weight:600; text-transform:uppercase;">Real-time Risk</div>
+                        <div class="circular-progress" id="score-circle">
+                            <div class="progress-value" id="risk-score">—</div>
+                        </div>
+                        <div style="text-align:center; margin-top:10px;">
+                            <span class="badge" id="risk-label">LOADING</span>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic channel breakdown -->
+                    <div style="width:100%; margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.05);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h4 class="muted" style="font-size:10px; text-transform:uppercase; letter-spacing:1px; margin:0;">Sentinel Signal</h4>
+                            <span id="sentinel-status" class="badge" style="font-size:8px;">OFFLINE</span>
+                        </div>
+                        <div id="sentinel-risk-bar" style="width:100%; height:6px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden; margin-bottom:8px;">
+                            <div id="sentinel-risk-fill" style="width:0%; height:100%; background:var(--cyber-blue); transition: width 0.5s ease;"></div>
+                        </div>
+                        <div id="sentinel-detections" class="muted" style="font-size:11px;">No physical threats detected.</div>
+                    </div>
+
+                    <div style="width:100%; margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.05);">
+                        <h4 class="muted" style="font-size:10px; text-transform:uppercase; letter-spacing:1px; margin-bottom:14px;">Channel Activity</h4>
+                        <div id="channel-list" style="display:flex; flex-direction:column; gap:10px;">
+                            <div style="color:var(--text-muted); font-size:12px;">Loading channels...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Card -->
+                <div class="card col-3">
+                    <div class="muted" style="font-size:12px; font-weight:600; text-transform:uppercase;">Flagged Amount</div>
+                    <div class="mono" id="stat-flagged-amt" style="font-size:28px; font-weight:700; margin:12px 0;">₹—</div>
+                    <div class="muted" id="stat-flagged-count" style="font-size:12px;">Across 0 transactions</div>
+                    <div style="margin-top:20px; display:flex; flex-direction:column; gap:8px;" id="risk-dist">
+                        <!-- Risk distribution populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Alerts Panel -->
+                <div class="card col-5">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <h3 style="font-size:14px; font-weight:600;">Live Fraud Alerts</h3>
+                        <span class="badge badge-danger" id="alert-badge">0</span>
+                    </div>
+                    <div id="alerts-list" style="display:flex; flex-direction:column; gap:10px; max-height:550px; overflow-y:auto;">
+                        <div style="color:var(--text-muted); font-size:12px; text-align:center; padding:20px;">Loading alerts...</div>
+                    </div>
+                </div>
+
+                <!-- Transaction Table -->
+                <div class="card col-8">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h3 style="font-size:15px; font-weight:600;">Master Transaction Stream</h3>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <div class="badge badge-info">LIVE FEED</div>
+                            <select id="filter-channel" class="txn-form-input" style="width:120px;" onchange="applyFilter()">
+                                <option value="">All Channels</option>
+                                <option value="ATM">ATM</option>
+                                <option value="UPI">UPI</option>
+                                <option value="NEFT">NEFT</option>
+                                <option value="RTGS">RTGS</option>
+                                <option value="online">Online</option>
+                                <option value="mobile">Mobile</option>
+                            </select>
+                            <label style="font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="filter-flagged" onchange="applyFilter()" style="cursor:pointer;"> Flagged Only
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-container" style="max-height:450px; overflow-y:auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Txn ID</th>
+                                    <th>Timestamp</th>
+                                    <th>Account</th>
+                                    <th>Channel</th>
+                                    <th>Amount</th>
+                                    <th>Score</th>
+                                    <th>Risk</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="txn-tbody">
+                                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">
+                                    <i class="fas fa-spinner fa-spin"></i> Loading transactions...
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Submit Transaction Test Card -->
+                <div class="card col-4">
+                    <h3 style="font-size:14px; font-weight:600; margin-bottom:4px;">Submit Test Transaction</h3>
+                    <p class="muted" style="font-size:11px; margin-bottom:12px;">Score any transaction against the fraud engine.</p>
+                    <div class="txn-submit-form">
+                        <input type="text"   class="txn-form-input" id="t-account" placeholder="Account ID" style="grid-column: span 2;">
+                        <input type="number" class="txn-form-input" id="t-amount"  placeholder="Amount (INR)">
+                        <select class="txn-form-input" id="t-channel">
+                            <option value="ATM">ATM</option>
+                            <option value="UPI">UPI</option>
+                            <option value="NEFT">NEFT</option>
+                            <option value="online">Online</option>
+                            <option value="mobile">Mobile</option>
+                        </select>
+                        <input type="text"   class="txn-form-input" id="t-merchant" placeholder="Merchant (optional)" style="grid-column: span 2;">
+                        <button class="btn btn-primary" style="grid-column: span 2; font-size:12px; padding:10px; margin-top:8px;" onclick="submitTestTxn()" id="txn-submit-btn">
+                            <i class="fas fa-paper-plane"></i> Submit & Score
+                        </button>
+                    </div>
+                    <div id="txn-submit-result" style="display:none; margin-top:14px; padding:14px; background:rgba(255,255,255,0.03); border-radius:8px;"></div>
+                </div>
+
+                <!-- Emergency Alert Card -->
+                <div class="card col-4" id="emergency-alert-card" style="border:1px solid rgba(255,51,102,0.25); background:rgba(255,51,102,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                        <h3 style="font-size:14px;font-weight:700;color:#FF3366;">🚨 Emergency Alert</h3>
+                        <span class="badge badge-danger" style="font-size:9px;">MANUAL DISPATCH</span>
+                    </div>
+                    <div id="emg-message" class="muted" style="font-size:11px;margin-bottom:16px;">Trigger immediate stakeholder notification for detected fraud.</div>
+                    <button id="send-alert-btn" onclick="sendAlertToAll(100, 'CRITICAL', 'Manual Emergency Alert triggered from Fraud Monitor.')"
+                        style="width:100%;padding:10px;border-radius:8px;border:1px solid #FF3366;
+                                background:rgba(255,51,102,0.12);color:#FF3366;font-family:monospace;
+                                font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;
+                                transition:all .2s;">
+                        🚨 SEND EMERGENCY ALERT
+                    </button>
+                    <div style="font-size:9px;color:rgba(255,255,255,0.2);margin-top:10px;text-align:center;">
+                        Sends to 4 stakeholders via email
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html" class="active"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+        const RISK_COLORS = { LOW: '#00E676', MEDIUM: '#FFB020', HIGH: '#FF6B35', CRITICAL: '#FF3366' };
+
+        // Live clock
+        setInterval(() => {
+            const el = document.getElementById('fraud-clock');
+            if (el) el.textContent = new Date().toLocaleTimeString();
+        }, 1000);
+
+        async function loadFusionData() {
+            try {
+                // 1. Get Fused Score
+                const fusion = await getFusionScore();
+                const score = fusion.score || 0;
+                const scoreColor = RISK_COLORS[fusion.risk_level] || '#00E676';
+                
+                document.getElementById('risk-score').textContent = score + '%';
+                document.getElementById('risk-score').style.color = scoreColor;
+                document.getElementById('score-circle').style.background = 
+                  `conic-gradient(${scoreColor} ${score}%, rgba(255,255,255,0.05) 0)`;
+                
+                const label = document.getElementById('risk-label');
+                label.textContent = fusion.risk_level;
+                label.style.background = scoreColor;
+                label.style.color = (fusion.risk_level === 'MEDIUM') ? '#000' : '#fff';
+
+                // Auto-send email alert if fraud score >= 80
+                autoTriggerAlert(
+                    score,
+                    fusion.risk_level,
+                    `Fraud Fusion Score: ${score}% (${fusion.risk_level}) — KAVACH Fraud Monitor`,
+                    'fraud_' + new Date().toISOString().slice(0, 16) // once per minute max
+                );
+
+                // 2. Sentinel specific signal
+                const sentinel = await getSentinelRisk();
+                const sStatus = document.getElementById('sentinel-status');
+                const sFill = document.getElementById('sentinel-risk-fill');
+                const sDet = document.getElementById('sentinel-detections');
+                
+                if (sentinel && sentinel.status !== 'sentinel_offline') {
+                    const sScore = sentinel.risk_score || 0;
+                    sStatus.textContent = sentinel.risk_level;
+                    sStatus.style.background = RISK_COLORS[sentinel.risk_level];
+                    sFill.style.width = sScore + '%';
+                    sFill.style.background = RISK_COLORS[sentinel.risk_level];
+                    sDet.textContent = sentinel.detections && sentinel.detections.length 
+                        ? `Threats: ${sentinel.detections.join(', ')}`
+                        : 'No physical threats detected.';
+                } else {
+                    sStatus.textContent = 'OFFLINE';
+                    sStatus.style.background = '#333';
+                    sFill.style.width = '0%';
+                }
+
+                // 3. Channels list
+                const chList = document.getElementById('channel-list');
+                chList.innerHTML = (fusion.channels || []).map(c => `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:12px; color:${c.triggered ? '#fff' : 'var(--t3)'}">${c.name}</span>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="width:60px; height:3px; background:rgba(255,255,255,0.05); border-radius:2px; overflow:hidden;">
+                                <div style="height:100%; width:${c.score}%; background:${c.score > 50 ? '#FF3366' : 'var(--blue)'}"></div>
+                            </div>
+                            <span class="mono" style="font-size:10px; color:${c.triggered ? '#FF3366' : 'var(--t3)'}">${c.score}%</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                // 4. Alerts
+                const alerts = await getFraudAlerts(8);
+                document.getElementById('alert-badge').textContent = alerts.length;
+                const alertsList = document.getElementById('alerts-list');
+                if (alerts.length === 0) {
+                    alertsList.innerHTML = '<div class="muted text-xs text-center p-4">No active alerts.</div>';
+                } else {
+                    alertsList.innerHTML = alerts.map(a => {
+                        const sev = a.severity || 'MEDIUM';
+                        const color = RISK_COLORS[sev] || '#FFB020';
+                        return `<div style="padding:10px; background:rgba(255,255,255,0.02); border-left:3px solid ${color}; border-radius:4px;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span style="font-size:11px; font-weight:700; color:${color}">${a.alert_type}</span>
+                                <span class="muted" style="font-size:9px;">${new Date(a.created_at).toLocaleTimeString()}</span>
+                            </div>
+                            <div class="muted" style="font-size:10px; margin-top:3px;">${a.description || a.summary || ''}</div>
+                        </div>`;
+                    }).join('');
+                }
+
+                // 5. Transactions & Stats
+                const params = {};
+                const chan = document.getElementById('filter-channel').value;
+                if (chan) params.channel = chan;
+                if (document.getElementById('filter-flagged').checked) params.flagged = true;
+                
+                const txns = await getTransactions({ limit: 40 });
+                const filtered = txns.filter(t => !chan || t.channel === chan)
+                                    .filter(t => !params.flagged || t.status === 'flagged');
+                
+                renderTransactions(filtered.slice(0, 15));
+
+                // Stats calc
+                const flaggedTxns = txns.filter(t => t.status === 'flagged');
+                const totalFlagged = flaggedTxns.reduce((sum, t) => sum + (t.amount || 0), 0);
+                document.getElementById('stat-flagged-amt').textContent = '₹' + totalFlagged.toLocaleString();
+                document.getElementById('stat-flagged-count').textContent = `Across ${flaggedTxns.length} transactions`;
+
+                // Risk distribution
+                const dist = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+                txns.forEach(t => { dist[t.risk_level] = (dist[t.risk_level] || 0) + 1; });
+                const distEl = document.getElementById('risk-dist');
+                distEl.innerHTML = Object.entries(dist).map(([lvl, count]) => {
+                    const pct = txns.length ? (count / txns.length * 100) : 0;
+                    return `
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <div style="display:flex; justify-content:space-between; font-size:10px;">
+                                <span class="muted">${lvl}</span>
+                                <span class="mono">${count}</span>
+                            </div>
+                            <div style="width:100%; height:4px; background:rgba(255,255,255,0.05); border-radius:2px; overflow:hidden;">
+                                <div style="height:100%; width:${pct}%; background:${RISK_COLORS[lvl]}"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch(e) { console.error('Fusion load error:', e); }
+        }
+
+        function applyFilter() { loadFusionData(); }
+
+        function renderTransactions(txns) {
+            const tbody = document.getElementById('txn-tbody');
+            if (!txns || txns.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center p-8 muted">No transactions.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = txns.map(t => {
+                const score = Math.round(t.fraud_score || 0);
+                const color = RISK_COLORS[t.risk_level] || '#888';
+                return `<tr>
+                    <td class="mono blue" style="font-size:10px;">${t.transaction_id.slice(0,12)}</td>
+                    <td class="muted" style="font-size:11px;">${new Date(t.timestamp).toLocaleTimeString()}</td>
+                    <td style="font-size:11px;">${t.account_id}</td>
+                    <td><span class="badge badge-info" style="font-size:8px;">${t.channel}</span></td>
+                    <td class="mono" style="font-size:11px;">₹${(t.amount||0).toLocaleString()}</td>
+                    <td><div style="display:flex;align-items:center;gap:6px">
+                        <div style="width:30px;height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden">
+                            <div style="height:100%;width:${score}%;background:${color}"></div>
+                        </div><span style="font-size:10px;color:${color}">${score}%</span>
+                    </div></td>
+                    <td style="font-size:10px;font-weight:700;color:${color}">${t.risk_level}</td>
+                    <td><span class="badge ${t.status==='flagged'?'badge-danger':'badge-success'}" style="font-size:8px;">${t.status.toUpperCase()}</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function submitTestTxn() {
+            const account = document.getElementById('t-account').value;
+            const amount = document.getElementById('t-amount').value;
+            const channel = document.getElementById('t-channel').value;
+            if (!account || !amount) return;
+
+            const btn = document.getElementById('txn-submit-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scoring...';
+
+            try {
+                await submitTransaction({ account_id: account, amount: parseFloat(amount), channel });
+                loadFusionData();
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit & Score';
+            }
+        }
+
+        loadFusionData();
+        setInterval(loadFusionData, 3000);
+    </script>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html" class="active"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+</body>
+</html>

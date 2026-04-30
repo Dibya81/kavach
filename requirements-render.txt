@@ -1,0 +1,33 @@
+# ============================================================
+# KAVACH — Lightweight Requirements (For Render Free Tier)
+# ============================================================
+
+# ── Web Framework & Servers ──────────────────────────────────
+fastapi
+uvicorn[standard]
+python-multipart
+aiofiles
+httpx
+
+# ── Database & Cloud ─────────────────────────────────────────
+supabase
+
+# ── HTTP / Networking ────────────────────────────────────────
+requests
+websockets
+
+# ── Blockchain ───────────────────────────────────────────────
+web3
+
+# ── Computer Vision (Lightweight) ──────────────────────────
+opencv-python-headless
+pillow
+pdfminer.six
+pytesseract
+
+# ── Utilities ────────────────────────────────────────────────
+python-dotenv
+pydantic
+rapidfuzz
+numpy
+reportlab

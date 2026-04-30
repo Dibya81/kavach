@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>KAVACH — Secure Login</title>
+<link rel="stylesheet" href="css/kavach.css"/>
+<style>
+/* ── Full-page layout ── */
+body{overflow:hidden;}
+
+.login-scene{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);
+}
+
+/* animated grid */
+.login-grid{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,210,255,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,210,255,0.03) 1px,transparent 1px);
+  background-size:52px 52px;
+  animation:gridDrift 20s linear infinite;
+}
+@keyframes gridDrift{from{background-position:0 0;}to{background-position:52px 52px;}}
+
+/* radial glows */
+.glow-top{
+  position:absolute;top:-200px;left:50%;transform:translateX(-50%);
+  width:800px;height:500px;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 0%,rgba(0,210,255,0.07) 0%,transparent 65%);
+}
+.glow-left{
+  position:absolute;bottom:0;left:-100px;
+  width:400px;height:400px;pointer-events:none;
+  background:radial-gradient(circle,rgba(155,110,255,0.05) 0%,transparent 70%);
+}
+.glow-right{
+  position:absolute;top:0;right:-100px;
+  width:400px;height:400px;pointer-events:none;
+  background:radial-gradient(circle,rgba(0,230,118,0.04) 0%,transparent 70%);
+}
+
+/* scan line */
+.scan-line{
+  position:absolute;left:0;right:0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,210,255,0.2),transparent);
+  animation:scan 8s linear infinite;
+}
+@keyframes scan{from{top:-1px;}to{top:100vh;}}
+
+/* ── Card ── */
+.login-card{
+  position:relative;z-index:10;
+  width:420px;
+  background:rgba(7,14,28,0.92);
+  border:1px solid var(--bmd);
+  border-radius:16px;
+  padding:40px 36px 32px;
+  backdrop-filter:blur(24px);
+  box-shadow:0 32px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04) inset;
+  animation:cardIn 0.5s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(20px) scale(.97);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+.card-top-line{
+  position:absolute;top:0;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,210,255,0.4),transparent);
+  border-radius:1px;
+}
+
+/* ── Logo block ── */
+.login-logo{
+  display:flex;flex-direction:column;align-items:center;
+  margin-bottom:28px;text-align:center;
+}
+.logo-mark{
+  width:52px;height:52px;border-radius:12px;
+  border:1.5px solid rgba(0,210,255,0.35);
+  background:rgba(0,210,255,0.06);
+  display:grid;place-items:center;
+  font-family:var(--display);font-size:22px;font-weight:800;
+  color:var(--blue);letter-spacing:1px;
+  box-shadow:0 0 24px rgba(0,210,255,0.12);
+  margin-bottom:14px;
+  position:relative;
+}
+.logo-mark::after{
+  content:'';position:absolute;inset:-4px;border-radius:15px;
+  border:1px solid rgba(0,210,255,0.1);
+}
+.logo-name{
+  font-family:var(--display);font-weight:800;font-size:22px;
+  letter-spacing:8px;color:var(--t1);margin-bottom:5px;
+}
+.logo-tagline{
+  font-size:8px;letter-spacing:2.5px;color:var(--t3);
+  text-transform:uppercase;line-height:1.6;
+}
+
+/* ── Divider ── */
+.login-divider{
+  height:1px;background:var(--border);margin:0 0 24px;
+  position:relative;
+}
+.login-divider::after{
+  content:'SECURE ACCESS';position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:7px;letter-spacing:3px;color:var(--t3);
+  background:rgba(7,14,28,0.92);padding:0 10px;
+}
+
+/* ── Form ── */
+.login-form{display:flex;flex-direction:column;gap:14px;}
+
+.field-wrap{display:flex;flex-direction:column;gap:5px;}
+.field-label{font-size:8px;letter-spacing:2px;color:var(--t3);text-transform:uppercase;}
+
+.field-input-wrap{position:relative;}
+.field-icon{
+  position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  font-size:12px;color:var(--t3);pointer-events:none;
+}
+.login-input{
+  width:100%;background:rgba(10,18,32,0.8);
+  border:1px solid var(--border);border-radius:var(--r);
+  color:var(--t1);font-family:var(--mono);font-size:12px;
+  padding:10px 11px 10px 34px;
+  outline:none;transition:border-color var(--t),box-shadow var(--t);
+  letter-spacing:0.5px;
+}
+.login-input:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(0,210,255,0.08);
+}
+.login-input::placeholder{color:var(--t3);}
+
+.pw-toggle{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--t3);cursor:pointer;
+  font-size:12px;padding:2px 4px;transition:color var(--t);
+}
+.pw-toggle:hover{color:var(--t2);}
+
+/* ── Error ── */
+.login-error{
+  display:none;align-items:center;gap:8px;
+  padding:9px 12px;border-radius:var(--r);
+  background:rgba(255,51,102,0.08);
+  border:1px solid rgba(255,51,102,0.2);
+  font-size:10px;color:var(--red);letter-spacing:0.5px;
+}
+.login-error.show{display:flex;}
+
+/* ── Submit button ── */
+.login-btn{
+  width:100%;padding:11px;border-radius:var(--r);
+  background:var(--blue);color:#050B14;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  letter-spacing:2.5px;border:none;cursor:pointer;
+  transition:all var(--t);margin-top:4px;
+  position:relative;overflow:hidden;
+}
+.login-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+  transform:translateX(-100%);transition:transform 0.5s;
+}
+.login-btn:hover{background:#33daff;box-shadow:0 0 24px rgba(0,210,255,0.3);}
+.login-btn:hover::before{transform:translateX(100%);}
+.login-btn:disabled{opacity:0.6;cursor:not-allowed;}
+.login-btn:disabled:hover{background:var(--blue);box-shadow:none;}
+
+/* ── Footer note ── */
+.login-footer{
+  margin-top:20px;text-align:center;
+  font-size:8px;letter-spacing:1.5px;color:var(--t3);
+  line-height:1.8;
+}
+.login-footer span{color:var(--t2);}
+
+/* ── System status strip ── */
+.status-strip{
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  margin-top:20px;padding-top:16px;
+  border-top:1px solid var(--border);
+}
+.strip-item{display:flex;align-items:center;gap:5px;font-size:8px;letter-spacing:1px;color:var(--t3);}
+.strip-dot{width:5px;height:5px;border-radius:50%;}
+
+/* ── Corner decorations ── */
+.corner{position:absolute;width:12px;height:12px;}
+.corner-tl{top:12px;left:12px;border-top:1px solid var(--blue);border-left:1px solid var(--blue);}
+.corner-tr{top:12px;right:12px;border-top:1px solid var(--blue);border-right:1px solid var(--blue);}
+.corner-bl{bottom:12px;left:12px;border-bottom:1px solid var(--blue);border-left:1px solid var(--blue);}
+.corner-br{bottom:12px;right:12px;border-bottom:1px solid var(--blue);border-right:1px solid var(--blue);}
+
+/* ── Version tag ── */
+.version-tag{
+  position:fixed;bottom:16px;right:20px;
+  font-size:8px;letter-spacing:1.5px;color:var(--t3);z-index:10;
+}
+</style>
+</head>
+<body>
+
+<div class="login-scene">
+  <div class="login-grid"></div>
+  <div class="glow-top"></div>
+  <div class="glow-left"></div>
+  <div class="glow-right"></div>
+  <div class="scan-line"></div>
+
+  <div class="login-card">
+    <div class="card-top-line"></div>
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <!-- Logo -->
+    <div class="login-logo">
+      <div class="logo-mark">K</div>
+      <div class="logo-name">KAVACH</div>
+      <div class="logo-tagline">Banking Fraud Detection Platform<br>Authorized Personnel Only</div>
+    </div>
+
+    <div class="login-divider"></div>
+
+    <!-- Error -->
+    <div class="login-error" id="login-error">
+      <span>✗</span><span id="error-text">Invalid credentials</span>
+    </div>
+
+    <!-- Form -->
+    <div class="login-form">
+      <div class="field-wrap">
+        <label class="field-label">Username</label>
+        <div class="field-input-wrap">
+          <span class="field-icon">◈</span>
+          <input class="login-input" id="badge" type="text"
+                 placeholder="admin" autocomplete="off"/>
+        </div>
+      </div>
+
+      <div class="field-wrap">
+        <label class="field-label">Password</label>
+        <div class="field-input-wrap">
+          <span class="field-icon">🔒</span>
+          <input class="login-input" id="password" type="password"
+                 placeholder="••••••••" id="password"/>
+          <button class="pw-toggle" type="button" onclick="togglePw()" id="pw-eye" title="Show/hide password">👁</button>
+        </div>
+      </div>
+
+      <button class="login-btn" id="login-btn" onclick="doLogin()">
+        AUTHENTICATE
+      </button>
+    </div>
+
+    <!-- Status strip -->
+    <div class="status-strip">
+      <div class="strip-item">
+        <div class="strip-dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>
+        ALL SYSTEMS NOMINAL
+      </div>
+      <div class="strip-item">
+        <div class="strip-dot" style="background:var(--blue)"></div>
+        <span id="strip-clock">--:-- UTC</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="login-footer">
+      CLASSIFIED SYSTEM — ALL ACCESS IS MONITORED AND AUDITED<br>
+      <span>KAVACH v2.0</span> · CID Karnataka · National Intelligence Platform<br>
+      <span style="color:rgba(0,210,255,0.4);font-size:7px;">Default: username=admin &nbsp;/&nbsp; password=admin</span>
+    </div>
+  </div>
+</div>
+
+<div class="version-tag">BUILD 2026.04</div>
+
+<script src="js/api.js"></script>
+<script>
+if(sessionStorage.getItem('kavach_token')){
+  window.location.href='dashboard.html';
+}
+
+// Clock
+setInterval(()=>{
+  document.getElementById('strip-clock').textContent=
+    new Date().toUTCString().slice(12,17)+' UTC';
+},1000);
+
+function togglePw(){
+  const inp=document.getElementById('password');
+  const eye=document.getElementById('pw-eye');
+  if(inp.type==='password'){inp.type='text';eye.textContent='🙈';}
+  else{inp.type='password';eye.textContent='👁';}
+}
+
+async function doLogin(){
+  const badge=document.getElementById('badge').value.trim();
+  const pass=document.getElementById('password').value.trim();
+  const btn=document.getElementById('login-btn');
+  const errEl=document.getElementById('login-error');
+  const errTxt=document.getElementById('error-text');
+
+  errEl.classList.remove('show');
+  btn.disabled=true;
+  btn.textContent='⟳ AUTHENTICATING...';
+
+  try{
+    await login(badge,pass);
+    btn.textContent='✓ ACCESS GRANTED';
+    btn.style.background='var(--green)';
+    setTimeout(()=>window.location.href='dashboard.html',400);
+  }catch(e){
+    errTxt.textContent=e.message||'Invalid credentials — access denied';
+    errEl.classList.add('show');
+    btn.disabled=false;
+    btn.textContent='AUTHENTICATE';
+    // shake the card
+    const card=document.querySelector('.login-card');
+    card.style.animation='none';
+    card.style.transform='translateX(6px)';
+    setTimeout(()=>{card.style.transform='translateX(-6px)';},80);
+    setTimeout(()=>{card.style.transform='translateX(0)';card.style.transition='transform 0.15s';},160);
+  }
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+</script>
+</body>
+</html>

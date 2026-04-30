@@ -1,0 +1,41 @@
+# ── Web Framework & Servers ──────────────────────────────────
+fastapi
+uvicorn[standard]
+python-multipart
+aiofiles
+httpx
+
+# ── Database & Cloud ─────────────────────────────────────────
+supabase
+
+# ── HTTP / Networking ────────────────────────────────────────
+requests
+websockets
+
+# ── Blockchain ───────────────────────────────────────────────
+web3
+
+# ── Computer Vision & AI ─────────────────────────────────────
+opencv-python-headless
+pillow
+pytesseract
+pdfminer.six
+torch>=2.0.0
+torchvision
+timm
+ultralytics>=8.0.0
+transformers
+accelerate
+safetensors
+huggingface_hub
+
+# ── PDF / Reporting ─────────────────────────────────────────
+reportlab
+
+# ── Utilities ────────────────────────────────────────────────
+python-dotenv
+pydantic
+rapidfuzz
+numpy
+python-bidi
+arabic-reshaper

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAVACH | FIR Warden</title>
+    <link rel="stylesheet" href="css/kavach.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>if(!sessionStorage.getItem('kavach_token')) window.location.href='index.html';</script>
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/emailjs-alert.js"></script>
+    <style>
+        .fir-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+        .form-input {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #fff;
+            font-family: var(--font-ui);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus { border-color: var(--cyber-blue); }
+        textarea.form-input { resize: vertical; min-height: 90px; }
+        .form-group.full { grid-column: span 2; }
+        
+        @media (max-width: 768px) {
+            .fir-form-grid { grid-template-columns: 1fr; }
+            .form-group.full { grid-column: span 1; }
+            .search-bar { width: 100% !important; margin-top: 16px; }
+            header { flex-direction: column; align-items: flex-start !important; }
+        }
+
+        .hash-result {
+            background: rgba(0,210,255,0.05);
+            border: 1px solid rgba(0,210,255,0.2);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        .hash-value {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--cyber-blue);
+            word-break: break-all;
+            margin-top: 8px;
+        }
+        .search-bar {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px 16px;
+            color: #fff;
+            width: 280px;
+            outline: none;
+            font-size: 13px;
+        }
+        .search-bar:focus { border-color: var(--cyber-blue); }
+        .status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        #toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 9999;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div id="toast"></div>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo"><i class="fas fa-shield-halved"></i><span>KAVACH</span></div>
+            <nav class="nav-group">
+                <div class="nav-label">Core</div>
+                <a href="dashboard.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+                <a href="fraud.html" class="nav-item"><i class="fas fa-user-secret"></i><span>Fraud Monitor</span></a>
+                <a href="fir.html" class="nav-item active"><i class="fas fa-file-invoice"></i><span>FIR Warden</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Surveillance</div>
+                <a href="sentinel.html" class="nav-item"><i class="fas fa-video"></i><span>Sentinel</span></a>
+                <a href="police_dashboard.html" class="nav-item" style="color: var(--critical-red);"><i class="fas fa-building-shield"></i><span>Police HQ</span></a>
+                <a href="deeptrace.html" class="nav-item"><i class="fas fa-fingerprint"></i><span>DeepTrace</span></a>
+                <a href="netwatch.html" class="nav-item"><i class="fas fa-network-wired"></i><span>NetWatch</span></a>
+            </nav>
+            <nav class="nav-group">
+                <div class="nav-label">Integrity</div>
+                <a href="blockchain.html" class="nav-item"><i class="fas fa-link"></i><span>Chain Audit</span></a>
+                <a href="docguard.html" class="nav-item"><i class="fas fa-id-card"></i><span>DocGuard</span></a>
+            </nav>
+            <nav class="nav-group" style="margin-top:auto; padding-top:20px; border-top:1px solid rgba(255,255,255,0.05);">
+                <a href="#" onclick="sessionStorage.clear(); window.location.href='index.html';" class="nav-item" style="color:var(--critical-red);">
+                    <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:32px;">
+                <div>
+                    <h1 style="font-size:24px; font-weight:700;">FIR Warden</h1>
+                    <p class="muted" style="margin-top:4px;">Register FIRs — auto-hashed and anchored to blockchain.</p>
+                </div>
+                <!-- Emergency Alert Mini Card -->
+                <div style="border:1px solid rgba(255,51,102,0.25); background:rgba(255,51,102,0.04); padding:12px 16px; border-radius:12px; display:flex; align-items:center; gap:16px;">
+                    <div>
+                        <div style="font-size:10px; font-weight:700; color:#FF3366; letter-spacing:1px; margin-bottom:2px;">🚨 EMERGENCY</div>
+                        <div class="muted" style="font-size:9px;">Manual alert dispatch</div>
+                    </div>
+                    <button onclick="sendAlertToAll(100, 'CRITICAL', 'Manual Emergency Alert triggered from FIR Warden.')"
+                        style="background:#FF3366; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:10px; font-weight:700; cursor:pointer; box-shadow:0 0 12px rgba(255,51,102,0.3);">
+                        SEND ALERT
+                    </button>
+                </div>
+            </header>
+
+            <!-- Create FIR Form -->
+            <div class="card" style="margin-bottom:28px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                    <h3 style="font-size:15px; font-weight:700;"><i class="fas fa-plus-circle accent-blue" style="margin-right:8px;"></i>Register New FIR</h3>
+                    <span class="badge badge-info" style="font-size:10px;">Auto Hash + Blockchain Anchor</span>
+                </div>
+
+                <div class="fir-form-grid">
+                    <div class="form-group">
+                        <label>FIR Number</label>
+                        <input type="text" id="fir-number" class="form-input" placeholder="e.g. FIR-2026-9001">
+                    </div>
+                    <div class="form-group">
+                        <label>Complainant Name</label>
+                        <input type="text" id="fir-complainant" class="form-input" placeholder="Full name of complainant">
+                    </div>
+                    <div class="form-group">
+                        <label>Incident Type</label>
+                        <select id="fir-type" class="form-input">
+                            <option value="">Select type...</option>
+                            <option value="PHISHING">Phishing</option>
+                            <option value="CARD_CLONING">Card Cloning</option>
+                            <option value="UPI_FRAUD">UPI Fraud</option>
+                            <option value="WIRE_FRAUD">Wire Fraud</option>
+                            <option value="IDENTITY_THEFT">Identity Theft</option>
+                            <option value="COORDINATED_ATTACK">Coordinated Attack</option>
+                            <option value="SENTINEL_ALERT">Sentinel Alert</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Incident</label>
+                        <input type="date" id="fir-date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <input type="text" id="fir-location" class="form-input" placeholder="City / Branch / ATM ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Officer Badge / ID</label>
+                        <input type="text" id="fir-officer" class="form-input" placeholder="e.g. KAV-0042">
+                    </div>
+                    <div class="form-group full">
+                        <label>Description</label>
+                        <textarea id="fir-description" class="form-input" placeholder="Detailed incident description..."></textarea>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:20px;">
+                    <button class="btn btn-primary" onclick="submitFIR()" id="fir-submit-btn">
+                        <i class="fas fa-file-signature"></i> Register FIR & Generate Hash
+                    </button>
+                    <button class="btn btn-outline" onclick="clearForm()">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                </div>
+
+                <!-- Hash Result Panel -->
+                <div class="hash-result" id="hash-result">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                        <i class="fas fa-check-circle" style="color:var(--safe-green); font-size:20px;"></i>
+                        <h4 style="font-size:14px; font-weight:700; color:var(--safe-green);">FIR Registered & Anchored</h4>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
+                        <div>
+                            <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:4px;">FIR ID</div>
+                            <div class="mono" id="result-fir-id" style="font-size:13px; color:var(--cyber-blue); font-weight:700;"></div>
+                        </div>
+                        <div>
+                            <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:4px;">Timestamp</div>
+                            <div id="result-timestamp" style="font-size:13px; font-weight:600;"></div>
+                        </div>
+                        <div>
+                            <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:4px;">Status</div>
+                            <div id="result-status" style="font-size:13px; font-weight:600;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top:16px;">
+                        <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:6px;">Integrity Hash (SHA-256)</div>
+                        <div class="hash-value" id="result-hash"></div>
+                    </div>
+                    <div style="margin-top:12px;" id="result-txhash-wrap">
+                        <div class="muted" style="font-size:10px; text-transform:uppercase; margin-bottom:6px;">Blockchain Tx Hash</div>
+                        <div class="hash-value" id="result-txhash"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FIR List -->
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3 style="font-size:15px; font-weight:600;">FIR Registry</h3>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <input type="text" class="search-bar" id="fir-search" placeholder="Search FIR ID, type, location..." oninput="filterFIRs()">
+                        <button class="btn btn-outline btn-sm" onclick="loadFIRs()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>FIR ID</th>
+                                <th>Date</th>
+                                <th>Complainant</th>
+                                <th>Type</th>
+                                <th>Location</th>
+                                <th>Officer</th>
+                                <th>Hash</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fir-tbody">
+                            <tr><td colspan="8" style="text-align:center; padding:40px; color:var(--text-muted);">
+                                <i class="fas fa-spinner fa-spin"></i> Loading FIRs...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html" class="active"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+
+    <script>
+        let allFIRs = [];
+
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.display = 'block';
+            t.style.background = type === 'success' ? 'rgba(0,230,118,0.15)' : 'rgba(255,51,102,0.15)';
+            t.style.border = `1px solid ${type === 'success' ? 'var(--safe-green)' : 'var(--critical-red)'}`;
+            t.style.color = type === 'success' ? 'var(--safe-green)' : 'var(--critical-red)';
+            setTimeout(() => { t.style.display = 'none'; }, 4000);
+        }
+
+        async function submitFIR() {
+            const btn = document.getElementById('fir-submit-btn');
+            const payload = {
+                fir_number:      document.getElementById('fir-number').value.trim(),
+                complainant:     document.getElementById('fir-complainant').value.trim(),
+                incident_type:   document.getElementById('fir-type').value,
+                date_of_incident:document.getElementById('fir-date').value,
+                location:        document.getElementById('fir-location').value.trim(),
+                officer_id:      document.getElementById('fir-officer').value.trim(),
+                description:     document.getElementById('fir-description').value.trim(),
+            };
+
+            if (!payload.complainant || !payload.incident_type || !payload.description) {
+                showToast('Please fill Complainant, Type and Description.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+
+            try {
+                const res = await registerFIR(payload);
+                
+                // Show hash result
+                const panel = document.getElementById('hash-result');
+                panel.style.display = 'block';
+                document.getElementById('result-fir-id').textContent = res.fir_id || res.id || '—';
+                document.getElementById('result-timestamp').textContent = res.created_at
+                    ? new Date(res.created_at).toLocaleString('en-IN')
+                    : new Date().toLocaleString('en-IN');
+                document.getElementById('result-status').innerHTML = `<span style="color:var(--safe-green)">✓ Anchored</span>`;
+                document.getElementById('result-hash').textContent = res.fir_hash || res.content_hash || '(hash generated)';
+
+                const txWrap = document.getElementById('result-txhash-wrap');
+                const txEl   = document.getElementById('result-txhash');
+                if (res.tx_hash || res.blockchain_tx) {
+                    txEl.textContent = res.tx_hash || res.blockchain_tx;
+                    txWrap.style.display = 'block';
+                } else {
+                    txWrap.style.display = 'none';
+                }
+
+                showToast('FIR registered and hash anchored to blockchain!');
+                clearForm();
+                loadFIRs();
+            } catch (err) {
+                showToast('Failed to register FIR: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-file-signature"></i> Register FIR & Generate Hash';
+            }
+        }
+
+        function clearForm() {
+            ['fir-number','fir-complainant','fir-date','fir-location','fir-officer','fir-description'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            const typeEl = document.getElementById('fir-type');
+            if (typeEl) typeEl.value = '';
+        }
+
+        async function loadFIRs() {
+            try {
+                allFIRs = await listFIRs();
+                renderFIRs(allFIRs);
+            } catch (err) {
+                document.getElementById('fir-tbody').innerHTML =
+                    `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--critical-red);">Error loading FIRs: ${err.message}</td></tr>`;
+            }
+        }
+
+        function filterFIRs() {
+            const q = document.getElementById('fir-search').value.toLowerCase();
+            if (!q) { renderFIRs(allFIRs); return; }
+            renderFIRs(allFIRs.filter(f =>
+                (f.fir_id||'').toLowerCase().includes(q) ||
+                (f.incident_type||'').toLowerCase().includes(q) ||
+                (f.location||'').toLowerCase().includes(q) ||
+                (f.complainant||'').toLowerCase().includes(q)
+            ));
+        }
+
+        function renderFIRs(firs) {
+            const tbody = document.getElementById('fir-tbody');
+            if (!firs || firs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted);">No FIRs found. Register one above.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = firs.map(f => {
+                const tampered = f.tampered;
+                const hash = (f.fir_hash || f.hash || f.content_hash || '').substring(0, 16);
+                const dateStr = f.date_of_incident || f.created_at
+                    ? new Date(f.date_of_incident || f.created_at).toLocaleDateString('en-IN')
+                    : '—';
+                const statusBadge = tampered
+                    ? '<span class="badge badge-danger">Tampered</span>'
+                    : '<span class="badge badge-success">Intact</span>';
+                return `<tr>
+                    <td class="mono accent-blue" style="font-size:12px;">${f.fir_id || f.id || '—'}</td>
+                    <td>${dateStr}</td>
+                    <td>${f.complainant || '—'}</td>
+                    <td><span class="badge badge-info" style="font-size:10px;">${f.incident_type || '—'}</span></td>
+                    <td>${f.location || '—'}</td>
+                    <td>${f.officer_id || '—'}</td>
+                    <td class="mono" style="font-size:11px; color:var(--text-muted);">${hash ? hash + '...' : '—'}</td>
+                    <td>${statusBadge}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        loadFIRs();
+        setInterval(loadFIRs, 15000);
+    </script>
+    
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav">
+        <a href="dashboard.html"><i class="fas fa-chart-line"></i><span>Home</span></a>
+        <a href="fraud.html"><i class="fas fa-user-secret"></i><span>Fraud</span></a>
+        <a href="fir.html" class="active"><i class="fas fa-file-invoice"></i><span>FIR</span></a>
+        <a href="sentinel.html"><i class="fas fa-video"></i><span>Sentinel</span></a>
+        <a href="deeptrace.html"><i class="fas fa-fingerprint"></i><span>Deep</span></a>
+        <a href="netwatch.html"><i class="fas fa-network-wired"></i><span>Net</span></a>
+        <a href="blockchain.html"><i class="fas fa-link"></i><span>Audit</span></a>
+        <a href="docguard.html"><i class="fas fa-id-card"></i><span>Docs</span></a>
+    </nav>
+</body>
+</html>

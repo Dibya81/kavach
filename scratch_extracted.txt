@@ -1,0 +1,25 @@
+<USER_REQUEST>
+update the entire frontend ,Now I have a thorough understanding of the project. Let me deliver the complete SQL schema and all frontend code.
+
+---
+
+## 🗄️ PART 1 — SUPABASE SQL SCHEMA
+
+Paste this entire block into your **Supabase SQL Editor** and run it:
+
+```sql
+-- ============================================================
+-- KAVACH — Complete Supabase Database Schema
+-- National Intelligence Platform · CID Karnataka
+-- ============================================================
+
+-- ── Extensions ───────────────────────────────────────────────
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================
+-- TABLE: users
+-- ============================================================
+CREATE TABLE IF NOT EXISTS users (
+  id              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+<truncated 126011 bytes>

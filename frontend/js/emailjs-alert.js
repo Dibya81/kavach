@@ -18,6 +18,7 @@ const ALERT_RECIPIENTS = [
   'akshyatarai07@gmail.com',        // Placeholder
 ];
 
+
 // ── Validate config on load ──────────────────────────────
 (function validateConfig() {
   const missing = [];

@@ -1,11 +1,4 @@
----
-title: Kavach-API
-emoji: 🛡️
-colorFrom: blue
-colorTo: red
-sdk: docker
-pinned: false
----
+
 
 # 🛡️ KAVACH — Advanced AI Police Security Platform
 
